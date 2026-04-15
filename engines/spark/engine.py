@@ -12,7 +12,12 @@ class SparkEngine(Engine):
         self._catalog_alias: str | None = None
 
     def setup(self) -> None:
+        import os
+        import sys
         from pyspark.sql import SparkSession
+
+        # Ensure PySpark workers use the same Python as the calling process (venv-safe)
+        os.environ["PYSPARK_PYTHON"] = sys.executable
 
         builder = SparkSession.builder.appName("iceberg-benchmark")
         for key, val in spark_config(self.catalog).items():
@@ -25,8 +30,6 @@ class SparkEngine(Engine):
         assert self._spark is not None, "Call setup() before run_query()"
         # Set search path so unqualified table names in TPC-H SQL resolve correctly
         self._spark.sql(f"USE {self._catalog_alias}.{namespace}")
-        import pdb
-        pdb.set_trace()
         df = self._spark.sql(sql)
         col_names = df.columns
         # collect() triggers actual execution — this is what we're timing

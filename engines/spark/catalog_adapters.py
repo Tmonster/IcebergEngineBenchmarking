@@ -8,19 +8,25 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from catalogs.base import Catalog
 
-# JAR versions — update these if you need a newer Iceberg or S3 Tables release
-_ICEBERG_SPARK_RUNTIME = "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.6.1"
-_S3TABLES_RUNTIME = "software.amazon.s3tables:s3-tables-catalog-for-iceberg-runtime:0.1.4"
-# AWS SDK v2 is not bundled in the S3 Tables runtime JAR — it's expected to be
-# provided by the environment (EMR/Glue). For local Spark we add it explicitly.
-_AWS_SDK_BUNDLE = "software.amazon.awssdk:bundle:2.28.0"
+SPARK_VERSION = "4.0"
+ICEBERG_VERSION = "1.10.1"
+
+_PACKAGES = ",".join([
+    "com.amazonaws:aws-java-sdk-bundle:1.12.661",
+    "org.apache.hadoop:hadoop-aws:3.3.4",
+    "software.amazon.awssdk:bundle:2.29.38",
+    "com.github.ben-manes.caffeine:caffeine:3.1.8",
+    "org.apache.commons:commons-configuration2:2.11.0",
+    "software.amazon.s3tables:s3-tables-catalog-for-iceberg:0.1.8",
+    f"org.apache.iceberg:iceberg-spark-runtime-{SPARK_VERSION}_2.13:{ICEBERG_VERSION}",
+])
 
 
 def spark_catalog_alias(catalog: "Catalog") -> str:
     props = catalog.connection_properties()
     match props["type"]:
         case "s3tables":
-            return "s3tablescatalog"
+            return "s3tablesbucket"
         case "local":
             return "local_iceberg"
         case _:
@@ -39,8 +45,9 @@ def spark_config(catalog: "Catalog") -> dict[str, str]:
 
 
 def _s3tables_config(props: dict) -> dict[str, str]:
-    alias = "s3tablescatalog"
+    alias = "s3tablesbucket"
     return {
+        "spark.jars.packages": _PACKAGES,
         "spark.sql.extensions": (
             "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
         ),
@@ -49,12 +56,7 @@ def _s3tables_config(props: dict) -> dict[str, str]:
             "software.amazon.s3tables.iceberg.S3TablesCatalog"
         ),
         f"spark.sql.catalog.{alias}.warehouse": props["s3tables_arn"],
-        "spark.jars.packages": f"{_ICEBERG_SPARK_RUNTIME},{_S3TABLES_RUNTIME},{_AWS_SDK_BUNDLE}",
-        # S3A credential chain for Spark executors reading Iceberg data files from S3
-        "spark.hadoop.fs.s3a.aws.credentials.provider": (
-            "com.amazonaws.auth.DefaultAWSCredentialsProviderChain"
-        ),
-        "spark.hadoop.fs.s3a.endpoint.region": props["region"],
+        f"spark.sql.catalog.{alias}.client.region": props["region"],
         # Bind driver and block manager to localhost so shuffle fetches don't fail
         # when the machine hostname doesn't resolve to an accessible address
         "spark.driver.host": "localhost",
@@ -64,12 +66,17 @@ def _s3tables_config(props: dict) -> dict[str, str]:
 
 def _local_config(props: dict) -> dict[str, str]:
     alias = "local_iceberg"
+    iceberg_runtime = (
+        f"org.apache.iceberg:iceberg-spark-runtime-{SPARK_VERSION}_2.13:{ICEBERG_VERSION}"
+    )
     return {
+        "spark.jars.packages": iceberg_runtime,
         "spark.sql.extensions": (
             "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
         ),
         f"spark.sql.catalog.{alias}": "org.apache.iceberg.spark.SparkCatalog",
         f"spark.sql.catalog.{alias}.type": "hadoop",
         f"spark.sql.catalog.{alias}.warehouse": props["warehouse_path"],
-        "spark.jars.packages": _ICEBERG_SPARK_RUNTIME,
+        "spark.driver.host": "localhost",
+        "spark.driver.bindAddress": "127.0.0.1",
     }

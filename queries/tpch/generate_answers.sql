@@ -1,3 +1,4 @@
+call dbgen(sf=1);
 pragma tpch(1);
 copy (from _) to 'queries/tpch/answers/sf1/q01.csv';
 pragma tpch(2);

@@ -17,7 +17,7 @@ duckdb = [
     "pyarrow>=14.0",
 ]
 spark = [
-    "pyspark>=3.5,<4.0",
+    "pyspark>=4.0",
     "iceberg-engine-benchmarking[duckdb]",
 ]
 local = [
