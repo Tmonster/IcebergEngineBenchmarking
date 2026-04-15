@@ -57,8 +57,8 @@ def _s3tables_config(props: dict) -> dict[str, str]:
         ),
         f"spark.sql.catalog.{alias}.warehouse": props["s3tables_arn"],
         f"spark.sql.catalog.{alias}.client.region": props["region"],
-        "spark.driver.memory": "8g",
-        "spark.executor.memory": "8g",
+        "spark.driver.memory": "25g",
+        "spark.executor.memory": "25g",
         "spark.local.dir": "/tmp/spark-spill",
     }
 
