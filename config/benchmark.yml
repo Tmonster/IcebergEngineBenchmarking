@@ -1,0 +1,4 @@
+scale_factor: 1
+warmup_runs: 1
+benchmark_runs: 3
+result_dir: results/

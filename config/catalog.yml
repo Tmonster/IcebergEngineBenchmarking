@@ -1,0 +1,8 @@
+type: s3tables
+region: eu-central-1
+account_id: "840140254803"   # replace with your AWS account ID
+bucket: duckdb-iceberg-benchmarking  # replace with your S3 Tables bucket name
+namespace: benchmarks
+
+
+# arn:aws:s3tables:eu-central-1:840140254803:bucket/duckdb-iceberg-benchmarking

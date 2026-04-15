@@ -1,0 +1,23 @@
+# TPC-H power test query execution order (stream 1 permutation per spec)
+14
+2
+9
+20
+6
+17
+18
+8
+21
+13
+3
+22
+16
+4
+11
+15
+1
+10
+19
+5
+7
+12
