@@ -25,6 +25,11 @@ local = [
     "pyiceberg[s3,pyarrow]>=0.7",
     "pyarrow>=14.0",
 ]
+plot = [
+    "seaborn>=0.13",
+    "matplotlib>=3.8",
+    "pandas>=2.0",
+]
 dev = [
     "pytest>=8.0",
     "ruff>=0.4",

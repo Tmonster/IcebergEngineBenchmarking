@@ -40,6 +40,7 @@ def _write_via_duckdb(catalog: "Catalog", namespace: str, data_dir: Path) -> Non
                 raise FileNotFoundError(
                     f"Missing {parquet_path}. Run `python -m setup.generate_data` first."
                 )
+            conn.execute(f"""DROP TABLE IF EXISTS {CATALOG_ALIAS}.{namespace}.{table_name}""")
             conn.execute(f"""
                 CREATE TABLE IF NOT EXISTS {CATALOG_ALIAS}.{namespace}.{table_name}
                 AS SELECT * FROM read_parquet('{parquet_path}');

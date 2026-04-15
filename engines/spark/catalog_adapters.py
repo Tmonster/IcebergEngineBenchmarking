@@ -57,12 +57,9 @@ def _s3tables_config(props: dict) -> dict[str, str]:
         ),
         f"spark.sql.catalog.{alias}.warehouse": props["s3tables_arn"],
         f"spark.sql.catalog.{alias}.client.region": props["region"],
-        # Bind driver and block manager to localhost so shuffle fetches don't fail
-        # when the machine hostname doesn't resolve to an accessible address
-        "spark.driver.host": "localhost",
-        "spark.driver.bindAddress": "127.0.0.1",
         "spark.driver.memory": "8g",
         "spark.executor.memory": "8g",
+        "spark.local.dir": "/tmp/spark-spill",
     }
 
 

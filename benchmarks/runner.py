@@ -85,7 +85,7 @@ class BenchmarkRunner:
 
     def write_results(self, results: list[QueryResult], tag: str) -> Path:
         ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
-        out = self.result_dir / f"{self.engine_name}_{tag}_{ts}.json"
+        out = self.result_dir / f"{self.engine_name}_{tag}_sf{self.scale_factor}_{ts}.json"
         out.write_text(json.dumps([asdict(r) for r in results], indent=2))
         return out
 

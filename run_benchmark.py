@@ -3,6 +3,7 @@ Usage:
     python run_benchmark.py --engine duckdb --benchmark analytical
     python run_benchmark.py --engine duckdb --benchmark power --sf 10
     python run_benchmark.py --engine duckdb --benchmark analytical --keep-tables --namespace my_ns
+    python run_benchmark.py --engine duckdb --benchmark analytical --skip-datagen --namespace my_ns
 """
 from __future__ import annotations
 
@@ -26,7 +27,11 @@ def main() -> None:
     parser.add_argument("--benchmark-config", default="config/benchmark.yml")
     parser.add_argument("--namespace", default=None, help="Namespace (default: auto-generated UUID)")
     parser.add_argument("--keep-tables", action="store_true", help="Skip teardown after run")
+    parser.add_argument("--skip-datagen", action="store_true", default=False, help="Skip data generation and use existing data in --namespace")
     args = parser.parse_args()
+
+    if args.skip_datagen and not args.namespace:
+        parser.error("--namespace is required when --skip-datagen is set")
 
     catalog_cfg = yaml.safe_load(Path(args.catalog_config).read_text())
     bench_cfg = yaml.safe_load(Path(args.benchmark_config).read_text())
@@ -46,8 +51,9 @@ def main() -> None:
         result_dir=result_dir,
     )
 
-    print(f"Provisioning namespace '{namespace}'...")
-    catalog.provision(namespace=namespace, data_dir=data_dir)
+    if not args.skip_datagen:
+        print(f"Provisioning namespace '{namespace}'...")
+        catalog.provision(namespace=namespace, data_dir=data_dir)
 
     print(f"\nRunning {args.benchmark} benchmark with {args.engine}...")
     engine.setup()
@@ -69,7 +75,7 @@ def main() -> None:
             print(f"\nTotal power test stream time: {total_elapsed:.2f}s")
     finally:
         engine.teardown()
-        if not args.keep_tables:
+        if not args.keep_tables and not args.skip_datagen:
             print(f"\nTearing down namespace '{namespace}'...")
             catalog.teardown(namespace=namespace)
 

@@ -28,6 +28,7 @@ def attach_catalog(conn: duckdb.DuckDBPyConnection, catalog: "Catalog") -> str:
 
     # turn off external file cache so results are not hot from cache
     conn.execute("pragma enable_external_file_cache=false")
+    # conn.execute("SET httpfs_connection_caching=true")
 
     match catalog_type:
         case "s3tables":
