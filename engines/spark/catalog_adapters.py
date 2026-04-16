@@ -60,6 +60,16 @@ def _s3tables_config(props: dict) -> dict[str, str]:
         "spark.driver.memory": "25g",
         "spark.executor.memory": "25g",
         "spark.local.dir": "/tmp/spark-spill",
+        # Use merge-on-read for DELETE/UPDATE/MERGE so Spark writes position-delete
+        # files rather than rewriting data files. This avoids ValidationException
+        # ("Missing required files to delete") caused by S3 Tables background
+        # optimization rewriting Parquet files between DELETE planning and commit.
+        f"spark.sql.catalog.{alias}.write.delete.mode": "merge-on-read",
+        f"spark.sql.catalog.{alias}.write.update.mode": "merge-on-read",
+        f"spark.sql.catalog.{alias}.write.merge.mode": "merge-on-read",
+        # Fair scheduler allows concurrent jobs from multiple threads to actually
+        # run in parallel rather than being queued FIFO (needed for throughput test).
+        "spark.scheduler.mode": "FAIR",
     }
 
 

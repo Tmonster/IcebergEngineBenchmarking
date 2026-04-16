@@ -19,6 +19,47 @@ TPCH_TABLES = [
 ]
 
 
+class _DuckDBCursorEngine:
+    """
+    Lightweight cursor-backed engine for concurrent throughput streams.
+    Shares the parent connection's attached catalog but has its own transaction
+    and USE context, making it safe to use from multiple threads simultaneously.
+    """
+
+    def __init__(self, cursor: duckdb.DuckDBPyConnection, catalog_alias: str):
+        self._cursor = cursor
+        self._catalog_alias = catalog_alias
+
+    def run_query(self, sql: str, namespace: str) -> tuple[list[tuple], list[str], int]:
+        self._cursor.execute(f"USE {self._catalog_alias}.{namespace};")
+        rel = self._cursor.execute(sql)
+        rows = rel.fetchall()
+        col_names = [desc[0] for desc in rel.description]
+        return rows, col_names, len(rows)
+
+    def run_rf1(self, data_dir: Path, namespace: str, set_n: int) -> None:
+        self._cursor.execute(f"USE {self._catalog_alias}.{namespace};")
+        orders = str((data_dir / f"orders_u{set_n}.parquet").absolute())
+        lineitem = str((data_dir / f"lineitem_u{set_n}.parquet").absolute())
+        self._cursor.execute(f"INSERT INTO orders SELECT * FROM read_parquet('{orders}')")
+        self._cursor.execute(f"INSERT INTO lineitem SELECT * FROM read_parquet('{lineitem}')")
+
+    def run_rf2(self, data_dir: Path, namespace: str, set_n: int) -> None:
+        self._cursor.execute(f"USE {self._catalog_alias}.{namespace};")
+        delete_keys = str((data_dir / f"delete_set_{set_n}.parquet").absolute())
+        self._cursor.execute(
+            f"DELETE FROM orders WHERE o_orderkey IN "
+            f"(SELECT o_orderkey FROM read_parquet('{delete_keys}'))"
+        )
+        self._cursor.execute(
+            f"DELETE FROM lineitem WHERE l_orderkey IN "
+            f"(SELECT o_orderkey FROM read_parquet('{delete_keys}'))"
+        )
+
+    def fork_for_stream(self) -> "_DuckDBCursorEngine":
+        return _DuckDBCursorEngine(self._cursor.cursor(), self._catalog_alias)
+
+
 class DuckDBEngine(Engine):
     def __init__(self, catalog: Catalog):
         super().__init__(catalog)
@@ -47,6 +88,31 @@ class DuckDBEngine(Engine):
         rows = relation.fetchall()
         col_names = [desc[0] for desc in relation.description]
         return rows, col_names, len(rows)
+
+    def run_rf1(self, data_dir: Path, namespace: str, set_n: int) -> None:
+        assert self._conn is not None, "Call setup() before run_rf1()"
+        self._conn.execute(f"USE {self._catalog_alias}.{namespace};")
+        orders = str((data_dir / f"orders_u{set_n}.parquet").absolute())
+        lineitem = str((data_dir / f"lineitem_u{set_n}.parquet").absolute())
+        self._conn.execute(f"INSERT INTO orders SELECT * FROM read_parquet('{orders}')")
+        self._conn.execute(f"INSERT INTO lineitem SELECT * FROM read_parquet('{lineitem}')")
+
+    def run_rf2(self, data_dir: Path, namespace: str, set_n: int) -> None:
+        assert self._conn is not None, "Call setup() before run_rf2()"
+        self._conn.execute(f"USE {self._catalog_alias}.{namespace};")
+        delete_keys = str((data_dir / f"delete_set_{set_n}.parquet").absolute())
+        self._conn.execute(
+            f"DELETE FROM orders WHERE o_orderkey IN "
+            f"(SELECT o_orderkey FROM read_parquet('{delete_keys}'))"
+        )
+        self._conn.execute(
+            f"DELETE FROM lineitem WHERE l_orderkey IN "
+            f"(SELECT o_orderkey FROM read_parquet('{delete_keys}'))"
+        )
+
+    def fork_for_stream(self) -> _DuckDBCursorEngine:
+        assert self._conn is not None, "Call setup() before fork_for_stream()"
+        return _DuckDBCursorEngine(self._conn.cursor(), self._catalog_alias)
 
     def teardown(self) -> None:
         if self._conn is not None:

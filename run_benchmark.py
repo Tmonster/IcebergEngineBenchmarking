@@ -28,6 +28,7 @@ def main() -> None:
     parser.add_argument("--namespace", default=None, help="Namespace (default: auto-generated UUID)")
     parser.add_argument("--keep-tables", action="store_true", help="Skip teardown after run")
     parser.add_argument("--skip-datagen", action="store_true", default=False, help="Skip data generation and use existing data in --namespace")
+    parser.add_argument("--update-streams", type=int, default=None, help="Number of refresh sets in the throughput test (default: max(1, round(0.1 * sf)))")
     args = parser.parse_args()
 
     if args.skip_datagen and not args.namespace:
@@ -70,9 +71,19 @@ def main() -> None:
             out = runner.write_results(results, tag="analytical")
         else:
             from benchmarks import power
-            results, total_elapsed = power.run(runner=runner, namespace=namespace)
-            out = runner.write_results(results, tag="power")
-            print(f"\nTotal power test stream time: {total_elapsed:.2f}s")
+            summary = power.run(
+                runner=runner,
+                namespace=namespace,
+                data_dir=data_dir,
+                update_streams=args.update_streams,
+            )
+            all_results = [
+                *summary.power_stream,
+                *(r for stream in summary.throughput_streams for r in stream),
+            ]
+            out = runner.write_results(all_results, tag="power")
+            if summary.monitor_log:
+                print(f"\nMonitor log: {summary.monitor_log}")
     finally:
         engine.teardown()
         if not args.keep_tables and not args.skip_datagen:

@@ -31,6 +31,7 @@ def write_tpch_tables(catalog: "Catalog", namespace: str, data_dir: Path) -> Non
         _write_via_duckdb(catalog, namespace, data_dir)
 
 
+
 def _write_via_duckdb(catalog: "Catalog", namespace: str, data_dir: Path) -> None:
     with duckdb.connect() as conn:
         attach_catalog(conn, catalog)
