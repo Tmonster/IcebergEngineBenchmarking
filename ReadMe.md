@@ -5,7 +5,9 @@ Sort of Vibe coded benchmark
 
 
 ### Machine Setup (e.g if running on EC2)
-On mounted storage on an EC2 (prevents EBS variance when solutions need to spill).
+
+The commands below will mount physical storage of an EC2 to prevent spill data getting interference from EBS.
+This command is also available using `./setup/mount.sh`
 Commands.
 ```
 mount_name=$(sudo lsblk | awk '
@@ -36,15 +38,18 @@ sudo mkdir $HOME/benchmark_mount
 sudo mount /dev/$mount_name $HOME/benchmark_mount
 
 # make clone of repo on mount
-sudo mkdir $HOME/benchmark_mount/db-benchmark-metal
+sudo mkdir $HOME/benchmark_mount/IcebergEngineBenchmarking
 sudo chown -R ubuntu:ubuntu $HOME/benchmark_mount
 
 
-git clone https://github.com/Tmonster/ $HOME/benchmark_mount/db-benchmark-metal
-cd $HOME/benchmark_mount/db-benchmark-metal
+git clone https://github.com/Tmonster/IcebergEngineBenchmarking.git $HOME/benchmark_mount/IcebergEngineBenchmarking
+cd $HOME/benchmark_mount/IcebergEngineBenchmarking
 ```
 
-This also sets up a place for spark to spill when needed
+#### Notes on Spark setup
+1. The spill area for spark is on the mount and is relative to the benchmark dir
+2. The driver memory size is set to 25G (feel free to modify if needed)
+3. The default delete strategy is merge on read. Copy on write is costly for power benchmark, and I have encountered errors.
 
 
 ### Benchmark Setup  
@@ -172,6 +177,34 @@ At one point I triggered the following. Can't quiet remember the setup. But this
 #
 ```
 
+
+Also encountered the following when running a power test for spark. This was for sf10
+```
+  [Power test]
+  Running RF1...
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+  RF1: 5.919s
+  Starting power query stream...
+  stream 0 [01/22] q14: 9.357s
+  stream 0 [02/22] q02: 3.588s
+26/04/16 14:28:56 WARN S3InputStream: Retrying read from S3, reopening stream (attempt 1)
+26/04/16 14:28:56 WARN S3InputStream: An error occurred while aborting the stream
+software.amazon.awssdk.core.exception.RetryableException: Data read has a different checksum than expected. Was 0x6aaf3e926fe7fc3e7dd74f260df7bc92, but expected 0x00000000000000000000000000000000. This commonly means that the data was corrupted between the client and service.
+        at software.amazon.awssdk.core.exception.RetryableException$BuilderImpl.build(RetryableException.java:99)
+        at software.amazon.awssdk.core.exception.RetryableException.create(RetryableException.java:35)
+        at software.amazon.awssdk.services.s3.internal.checksums.S3ChecksumValidatingInputStream.validateAndThrow(S3ChecksumValidatingInputStream.java:172)
+        at software.amazon.awssdk.services.s3.internal.checksums.S3ChecksumValidatingInputStream.read(S3ChecksumValidatingInputStream.java:84)
+        at java.base/java.io.FilterInputStream.read(FilterInputStream.java:82)
+        at software.amazon.awssdk.core.io.SdkFilterInputStream.read(SdkFilterInputStream.java:60)
+        at software.amazon.awssdk.core.internal.metrics.BytesReadTrackingInputStream.read(BytesReadTrackingInputStream.java:42)
+        at java.base/java.io.FilterInputStream.read(FilterInputStream.java:82)
+        at software.amazon.awssdk.core.io.SdkFilterInputStream.read(SdkFilterInputStream.java:60)
+        at org.apache.iceberg.aws.s3.S3InputStream.abortStream(S3InputStream.java:281)
+        at org.apache.iceberg.aws.s3.S3InputStream.closeStream(S3InputStream.java:259)
+        at org.apache.iceberg.aws.s3.S3InputStream.openStream(S3InputStream.java:241)
+```
 
 
 I need to tune the memory size for Java. 

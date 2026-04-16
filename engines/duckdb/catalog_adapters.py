@@ -4,6 +4,7 @@ Each catalog type gets its own _attach_* function.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import duckdb
@@ -21,6 +22,9 @@ def attach_catalog(conn: duckdb.DuckDBPyConnection, catalog: "Catalog") -> str:
     """
     props = catalog.connection_properties()
     catalog_type = props["type"]
+
+    if catalog_type == "ducklake":
+        return _attach_ducklake(conn, props)
 
     conn.execute("INSTALL iceberg; LOAD iceberg;")
     conn.execute("INSTALL aws; LOAD aws;")
@@ -70,6 +74,20 @@ def _attach_local(conn: duckdb.DuckDBPyConnection, props: dict) -> str:
 
 
 _LOCAL_ALIAS = "local_iceberg"
+_DUCKLAKE_ALIAS = "ducklake_catalog"
+
+
+def _attach_ducklake(conn: duckdb.DuckDBPyConnection, props: dict) -> str:
+    conn.execute("INSTALL ducklake; LOAD ducklake;")
+    # turn off external file cache so results are not hot from cache
+    conn.execute("pragma enable_external_file_cache=false")
+    metadata_path = props["metadata_path"]
+    data_path = props["data_path"]
+    Path(data_path).mkdir(parents=True, exist_ok=True)
+    conn.execute(
+        f"ATTACH 'ducklake:{metadata_path}' AS {_DUCKLAKE_ALIAS} (DATA_PATH '{data_path}')"
+    )
+    return _DUCKLAKE_ALIAS
 
 
 def setup_local_views(

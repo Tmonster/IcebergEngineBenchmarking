@@ -18,6 +18,12 @@ class SparkEngine(Engine):
         import sys
         from pyspark.sql import SparkSession
 
+        from catalogs.ducklake import DuckLakeCatalog
+        if isinstance(self.catalog, DuckLakeCatalog):
+            raise NotImplementedError(
+                "DuckLake catalog is DuckDB-only and cannot be used with the Spark engine."
+            )
+
         # Ensure PySpark workers use the same Python as the calling process (venv-safe)
         os.environ["PYSPARK_PYTHON"] = sys.executable
 

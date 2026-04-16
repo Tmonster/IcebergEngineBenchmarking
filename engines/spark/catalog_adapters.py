@@ -58,8 +58,10 @@ def _s3tables_config(props: dict) -> dict[str, str]:
         f"spark.sql.catalog.{alias}.warehouse": props["s3tables_arn"],
         f"spark.sql.catalog.{alias}.client.region": props["region"],
         "spark.driver.memory": "25g",
+        "spark.driver.maxResultSize":"1g",
         "spark.executor.memory": "25g",
-        "spark.local.dir": "/tmp/spark-spill",
+        "spark.executor.memoryOverhead":"2g",
+        "spark.local.dir": "./spark-spill",
         # Use merge-on-read for DELETE/UPDATE/MERGE so Spark writes position-delete
         # files rather than rewriting data files. This avoids ValidationException
         # ("Missing required files to delete") caused by S3 Tables background
@@ -70,6 +72,8 @@ def _s3tables_config(props: dict) -> dict[str, str]:
         # Fair scheduler allows concurrent jobs from multiple threads to actually
         # run in parallel rather than being queued FIFO (needed for throughput test).
         "spark.scheduler.mode": "FAIR",
+        "spark.serializer":"org.apache.spark.serializer.KryoSerializer",
+        "spark.kryoserializer.buffer.max":"128m"
     }
 
 
