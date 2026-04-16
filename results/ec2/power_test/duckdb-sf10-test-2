@@ -1,0 +1,122 @@
+Provisioning namespace 'bench_706231d7'...
+  bench_706231d7.customer: 1,500,000 rows written
+  bench_706231d7.lineitem: 59,986,052 rows written
+  bench_706231d7.nation: 25 rows written
+  bench_706231d7.orders: 15,000,000 rows written
+  bench_706231d7.part: 2,000,000 rows written
+  bench_706231d7.partsupp: 8,000,000 rows written
+  bench_706231d7.region: 5 rows written
+  bench_706231d7.supplier: 100,000 rows written
+
+Running power benchmark with duckdb...
+  SF=10 → 3 throughput stream(s), 1 update stream(s)
+  Resource monitor logging to results/power_monitor_duckdb_sf10_20260416T152102.tsv
+
+  [Power test]
+  Running RF1...
+  RF1: 1.179s
+  Starting power query stream...
+  stream 0 [01/22] q14: 7.046s
+  stream 0 [02/22] q02: 3.088s
+  stream 0 [03/22] q09: 8.492s
+  stream 0 [04/22] q20: 6.174s
+  stream 0 [05/22] q06: 4.859s
+  stream 0 [06/22] q17: 6.820s
+  stream 0 [07/22] q18: 7.924s
+  stream 0 [08/22] q08: 7.262s
+  stream 0 [09/22] q21: 13.014s
+  stream 0 [10/22] q13: 1.792s
+  stream 0 [11/22] q03: 5.743s
+  stream 0 [12/22] q22: 1.333s
+  stream 0 [13/22] q16: 1.268s
+  stream 0 [14/22] q04: 4.506s
+  stream 0 [15/22] q11: 1.585s
+  stream 0 [16/22] q15: 4.265s
+  stream 0 [17/22] q01: 4.215s
+  stream 0 [18/22] q10: 6.277s
+  stream 0 [19/22] q19: 6.127s
+  stream 0 [20/22] q05: 6.089s
+  stream 0 [21/22] q07: 6.410s
+  stream 0 [22/22] q12: 5.722s
+  Running RF2...
+  RF2: 1.034s
+  power_score = 8685.19 QphH@10GB
+
+  [Throughput test]
+  Starting 3 query stream(s) + refresh thread (1 set(s))...
+  throughput RF set 2: 2.643s
+  stream 1 [01/22] q14: 5.049s
+  stream 2 [01/22] q14: 11.059s
+  stream 0 [01/22] q14: 12.400s
+  stream 1 [02/22] q02: 7.785s
+  stream 2 [02/22] q02: 3.004s
+  stream 0 [02/22] q02: 4.382s
+  stream 1 [03/22] q09: 9.454s
+  stream 2 [03/22] q09: 18.983s
+  stream 0 [03/22] q09: 17.940s
+  stream 1 [04/22] q20: 15.988s
+  stream 1 [05/22] q06: 8.782s
+  stream 2 [04/22] q20: 14.574s
+  stream 0 [04/22] q20: 19.361s
+  stream 2 [05/22] q06: 10.106s
+  stream 0 [05/22] q06: 9.632s
+  stream 1 [06/22] q17: 20.643s
+  stream 2 [06/22] q17: 19.553s
+  stream 0 [06/22] q17: 19.554s
+  stream 1 [07/22] q18: 18.981s
+  stream 2 [07/22] q18: 16.314s
+  stream 1 [08/22] q08: 12.659s
+  stream 0 [07/22] q18: 20.319s
+  stream 2 [08/22] q08: 18.603s
+  stream 0 [08/22] q08: 21.204s
+  stream 1 [09/22] q21: 30.729s
+  stream 1 [10/22] q13: 2.685s
+  stream 2 [09/22] q21: 24.398s
+  stream 2 [10/22] q13: 6.427s
+  stream 1 [11/22] q03: 13.010s
+  stream 1 [12/22] q22: 5.743s
+  stream 2 [11/22] q03: 12.681s
+  stream 1 [13/22] q16: 4.955s
+  stream 0 [09/22] q21: 33.586s
+  stream 2 [12/22] q22: 4.203s
+  stream 0 [10/22] q13: 3.925s
+  stream 2 [13/22] q16: 3.685s
+  stream 1 [14/22] q04: 8.317s
+  stream 2 [14/22] q04: 8.739s
+  stream 1 [15/22] q11: 7.831s
+  stream 0 [11/22] q03: 11.612s
+  stream 1 [16/22] q15: 5.241s
+  stream 0 [12/22] q22: 4.684s
+  stream 2 [15/22] q11: 7.237s
+  stream 0 [13/22] q16: 3.735s
+  stream 1 [17/22] q01: 5.739s
+  stream 2 [16/22] q15: 7.649s
+  stream 0 [14/22] q04: 12.563s
+  stream 2 [17/22] q01: 8.094s
+  stream 1 [18/22] q10: 17.062s
+  stream 0 [15/22] q11: 6.254s
+  stream 2 [18/22] q10: 17.630s
+  stream 1 [19/22] q19: 12.769s
+  stream 0 [16/22] q15: 12.859s
+  stream 2 [19/22] q19: 7.947s
+  stream 0 [17/22] q01: 11.562s
+  stream 1 [20/22] q05: 14.934s
+  stream 2 [20/22] q05: 12.090s
+  stream 1 [21/22] q07: 14.981s
+  stream 0 [18/22] q10: 18.015s
+  stream 1 [22/22] q12: 13.259s
+  stream 0 [19/22] q19: 13.195s
+  stream 2 [21/22] q07: 23.936s
+  stream 2 [22/22] q12: 6.662s
+  stream 0 [20/22] q05: 10.785s
+  stream 0 [21/22] q07: 6.965s
+  stream 0 [22/22] q12: 6.214s
+  throughput interval = 280.75s
+  throughput_score    = 8462.91 QphH@10GB
+  QphH@10GB = 8573.33
+
+Monitor log: results/power_monitor_duckdb_sf10_20260416T152102.tsv
+
+Tearing down namespace 'bench_706231d7'...
+
+Results written to results/duckdb_power_sf10_20260416T152745.json

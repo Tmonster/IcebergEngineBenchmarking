@@ -1,0 +1,238 @@
+
+  [Power test]
+  Running RF1...
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+  RF1: 5.910s
+  Starting power query stream...
+  stream 0 [01/22] q14: 9.560s
+  stream 0 [02/22] q02: 3.714s
+  stream 0 [03/22] q09: 12.306s
+  stream 0 [04/22] q20: 6.936s
+  stream 0 [05/22] q06: 6.597s
+  stream 0 [06/22] q17: 14.088s
+  stream 0 [07/22] q18: 14.814s
+  stream 0 [08/22] q08: 8.719s
+  stream 0 [09/22] q21: 18.184s
+  stream 0 [10/22] q13: 3.622s
+  stream 0 [11/22] q03: 7.850s
+  stream 0 [12/22] q22: 2.196s
+  stream 0 [13/22] q16: 2.951s
+  stream 0 [14/22] q04: 6.838s
+  stream 0 [15/22] q11: 2.384s
+  stream 0 [16/22] q15: 10.323s
+  stream 0 [17/22] q01: 9.700s
+  stream 0 [18/22] q10: 9.127s
+  stream 0 [19/22] q19: 9.521s
+  stream 0 [20/22] q05: 9.143s
+  stream 0 [21/22] q07: 9.407s
+  stream 0 [22/22] q12: 9.577s
+  Running RF2...
+  RF2: 7.897s
+  power_score = 4883.02 QphH@10GB
+
+  [Throughput test]
+  Starting 3 query stream(s) + refresh thread (1 set(s))...
+  stream 0 [01/22] q14: 16.451s                                                 ]
+  stream 1 [01/22] q14: 17.941s
+  stream 2 [01/22] q14: 17.996s
+  throughput RF set 2: 19.301s
+  stream 0 [02/22] q02: 4.277s
+  stream 1 [02/22] q02: 4.656s
+  stream 2 [02/22] q02: 4.850s
+  stream 0 [03/22] q09: 26.221s
+  stream 1 [03/22] q09: 24.815s
+  stream 2 [03/22] q09: 27.647s
+  stream 0 [04/22] q20: 16.077s
+  stream 1 [04/22] q20: 17.071s
+  stream 2 [04/22] q20: 15.414s
+26/04/16 15:12:37 WARN S3InputStream: Retrying read from S3, reopening stream (attempt 1)
+26/04/16 15:12:37 WARN S3InputStream: Retrying read from S3, reopening stream (attempt 1)
+26/04/16 15:12:37 WARN S3InputStream: An error occurred while aborting the stream
+software.amazon.awssdk.core.exception.RetryableException: Data read has a different checksum than expected. Was 0x160393dd3f003d7fab1d0af6028b7697, but expected 0x00000000000000000000000000000000. This commonly means that the data was corrupted between the client and service.
+        at software.amazon.awssdk.core.exception.RetryableException$BuilderImpl.build(RetryableException.java:99)
+        at software.amazon.awssdk.core.exception.RetryableException.create(RetryableException.java:35)
+        at software.amazon.awssdk.services.s3.internal.checksums.S3ChecksumValidatingInputStream.validateAndThrow(S3ChecksumValidatingInputStream.java:172)
+        at software.amazon.awssdk.services.s3.internal.checksums.S3ChecksumValidatingInputStream.read(S3ChecksumValidatingInputStream.java:84)
+        at java.base/java.io.FilterInputStream.read(FilterInputStream.java:82)
+        at software.amazon.awssdk.core.io.SdkFilterInputStream.read(SdkFilterInputStream.java:60)
+        at software.amazon.awssdk.core.internal.metrics.BytesReadTrackingInputStream.read(BytesReadTrackingInputStream.java:42)
+        at java.base/java.io.FilterInputStream.read(FilterInputStream.java:82)
+        at software.amazon.awssdk.core.io.SdkFilterInputStream.read(SdkFilterInputStream.java:60)
+        at org.apache.iceberg.aws.s3.S3InputStream.abortStream(S3InputStream.java:281)
+        at org.apache.iceberg.aws.s3.S3InputStream.closeStream(S3InputStream.java:259)
+        at org.apache.iceberg.aws.s3.S3InputStream.openStream(S3InputStream.java:241)
+        at org.apache.iceberg.aws.s3.S3InputStream.resetForRetry(S3InputStream.java:252)
+        at org.apache.iceberg.aws.s3.S3InputStream.lambda$new$0(S3InputStream.java:79)
+        at dev.failsafe.event.EventListener.acceptUnchecked(EventListener.java:32)
+        at dev.failsafe.internal.EventHandler.lambda$ofExecutionAttempted$1(EventHandler.java:45)
+        at dev.failsafe.internal.RetryPolicyExecutor.lambda$apply$0(RetryPolicyExecutor.java:110)
+        at dev.failsafe.SyncExecutionImpl.executeSync(SyncExecutionImpl.java:187)
+        at dev.failsafe.FailsafeExecutor.call(FailsafeExecutor.java:376)
+        at dev.failsafe.FailsafeExecutor.get(FailsafeExecutor.java:112)
+        at org.apache.iceberg.aws.s3.S3InputStream.read(S3InputStream.java:146)
+        at org.apache.iceberg.shaded.org.apache.parquet.io.DelegatingSeekableInputStream.readFully(DelegatingSeekableInputStream.java:102)
+        at org.apache.iceberg.shaded.org.apache.parquet.io.DelegatingSeekableInputStream.readFullyHeapBuffer(DelegatingSeekableInputStream.java:126)
+        at org.apache.iceberg.shaded.org.apache.parquet.io.DelegatingSeekableInputStream.readFully(DelegatingSeekableInputStream.java:91)
+        at org.apache.iceberg.shaded.org.apache.parquet.hadoop.ParquetFileReader$ConsecutivePartList.readAll(ParquetFileReader.java:2264)
+        at org.apache.iceberg.shaded.org.apache.parquet.hadoop.ParquetFileReader.readAllPartsVectoredOrNormal(ParquetFileReader.java:1283)
+        at org.apache.iceberg.shaded.org.apache.parquet.hadoop.ParquetFileReader.internalReadRowGroup(ParquetFileReader.java:1185)
+        at org.apache.iceberg.shaded.org.apache.parquet.hadoop.ParquetFileReader.readNextRowGroup(ParquetFileReader.java:1135)
+        at org.apache.iceberg.parquet.VectorizedParquetReader$FileIterator.advance(VectorizedParquetReader.java:161)
+        at org.apache.iceberg.parquet.VectorizedParquetReader$FileIterator.next(VectorizedParquetReader.java:139)
+        at org.apache.iceberg.spark.source.BaseReader.next(BaseReader.java:136)
+        at org.apache.spark.sql.execution.datasources.v2.PartitionIterator.hasNext(DataSourceRDD.scala:148)
+        at org.apache.spark.sql.execution.datasources.v2.MetricsIterator.hasNext(DataSourceRDD.scala:186)
+        at org.apache.spark.sql.execution.datasources.v2.DataSourceRDD$$anon$1.$anonfun$hasNext$1(DataSourceRDD.scala:72)
+        at org.apache.spark.sql.execution.datasources.v2.DataSourceRDD$$anon$1.$anonfun$hasNext$1$adapted(DataSourceRDD.scala:72)
+        at scala.Option.exists(Option.scala:406)
+        at org.apache.spark.sql.execution.datasources.v2.DataSourceRDD$$anon$1.hasNext(DataSourceRDD.scala:72)
+        at org.apache.spark.InterruptibleIterator.hasNext(InterruptibleIterator.scala:37)
+        at scala.collection.Iterator$$anon$9.hasNext(Iterator.scala:593)
+        at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage1.columnartorow_nextBatch_0$(Unknown Source)
+        at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage1.hashAgg_doAggregateWithoutKey_0$(Unknown Source)
+        at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage1.processNext(Unknown Source)
+        at org.apache.spark.sql.execution.BufferedRowIterator.hasNext(BufferedRowIterator.java:43)
+        at org.apache.spark.sql.execution.WholeStageCodegenEvaluatorFactory$WholeStageCodegenPartitionEvaluator$$anon$1.hasNext(WholeStageCodegenEvaluatorFactory.scala:50)
+        at scala.collection.Iterator$$anon$9.hasNext(Iterator.scala:593)
+        at org.apache.spark.shuffle.sort.BypassMergeSortShuffleWriter.write(BypassMergeSortShuffleWriter.java:153)
+        at org.apache.spark.shuffle.ShuffleWriteProcessor.write(ShuffleWriteProcessor.scala:57)
+        at org.apache.spark.scheduler.ShuffleMapTask.runTask(ShuffleMapTask.scala:111)
+        at org.apache.spark.scheduler.ShuffleMapTask.runTask(ShuffleMapTask.scala:54)
+        at org.apache.spark.TaskContext.runTaskWithListeners(TaskContext.scala:180)
+        at org.apache.spark.scheduler.Task.run(Task.scala:147)
+        at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$5(Executor.scala:716)
+        at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally(SparkErrorUtils.scala:86)
+        at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally$(SparkErrorUtils.scala:83)
+        at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:97)
+        at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:719)
+        at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+        at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+        at java.base/java.lang.Thread.run(Thread.java:840)
+26/04/16 15:12:37 WARN S3InputStream: An error occurred while aborting the stream
+software.amazon.awssdk.core.exception.RetryableException: Data read has a different checksum than expected. Was 0x71b411445969e341e111f7ed0dfcf8ca, but expected 0x00000000000000000000000000000000. This commonly means that the data was corrupted between the client and service.
+        at software.amazon.awssdk.core.exception.RetryableException$BuilderImpl.build(RetryableException.java:99)
+        at software.amazon.awssdk.core.exception.RetryableException.create(RetryableException.java:35)
+        at software.amazon.awssdk.services.s3.internal.checksums.S3ChecksumValidatingInputStream.validateAndThrow(S3ChecksumValidatingInputStream.java:172)
+        at software.amazon.awssdk.services.s3.internal.checksums.S3ChecksumValidatingInputStream.read(S3ChecksumValidatingInputStream.java:84)
+        at java.base/java.io.FilterInputStream.read(FilterInputStream.java:82)
+        at software.amazon.awssdk.core.io.SdkFilterInputStream.read(SdkFilterInputStream.java:60)
+        at software.amazon.awssdk.core.internal.metrics.BytesReadTrackingInputStream.read(BytesReadTrackingInputStream.java:42)
+        at java.base/java.io.FilterInputStream.read(FilterInputStream.java:82)
+        at software.amazon.awssdk.core.io.SdkFilterInputStream.read(SdkFilterInputStream.java:60)
+        at org.apache.iceberg.aws.s3.S3InputStream.abortStream(S3InputStream.java:281)
+        at org.apache.iceberg.aws.s3.S3InputStream.closeStream(S3InputStream.java:259)
+        at org.apache.iceberg.aws.s3.S3InputStream.openStream(S3InputStream.java:241)
+        at org.apache.iceberg.aws.s3.S3InputStream.resetForRetry(S3InputStream.java:252)
+        at org.apache.iceberg.aws.s3.S3InputStream.lambda$new$0(S3InputStream.java:79)
+        at dev.failsafe.event.EventListener.acceptUnchecked(EventListener.java:32)
+        at dev.failsafe.internal.EventHandler.lambda$ofExecutionAttempted$1(EventHandler.java:45)
+        at dev.failsafe.internal.RetryPolicyExecutor.lambda$apply$0(RetryPolicyExecutor.java:110)
+        at dev.failsafe.SyncExecutionImpl.executeSync(SyncExecutionImpl.java:187)
+        at dev.failsafe.FailsafeExecutor.call(FailsafeExecutor.java:376)
+        at dev.failsafe.FailsafeExecutor.get(FailsafeExecutor.java:112)
+        at org.apache.iceberg.aws.s3.S3InputStream.read(S3InputStream.java:146)
+        at org.apache.iceberg.shaded.org.apache.parquet.io.DelegatingSeekableInputStream.readFully(DelegatingSeekableInputStream.java:102)
+        at org.apache.iceberg.shaded.org.apache.parquet.io.DelegatingSeekableInputStream.readFullyHeapBuffer(DelegatingSeekableInputStream.java:126)
+        at org.apache.iceberg.shaded.org.apache.parquet.io.DelegatingSeekableInputStream.readFully(DelegatingSeekableInputStream.java:91)
+        at org.apache.iceberg.shaded.org.apache.parquet.hadoop.ParquetFileReader$ConsecutivePartList.readAll(ParquetFileReader.java:2264)
+        at org.apache.iceberg.shaded.org.apache.parquet.hadoop.ParquetFileReader.readAllPartsVectoredOrNormal(ParquetFileReader.java:1283)
+        at org.apache.iceberg.shaded.org.apache.parquet.hadoop.ParquetFileReader.internalReadRowGroup(ParquetFileReader.java:1185)
+        at org.apache.iceberg.shaded.org.apache.parquet.hadoop.ParquetFileReader.readNextRowGroup(ParquetFileReader.java:1135)
+        at org.apache.iceberg.parquet.VectorizedParquetReader$FileIterator.advance(VectorizedParquetReader.java:161)
+        at org.apache.iceberg.parquet.VectorizedParquetReader$FileIterator.next(VectorizedParquetReader.java:139)
+        at org.apache.iceberg.spark.source.BaseReader.next(BaseReader.java:136)
+        at org.apache.spark.sql.execution.datasources.v2.PartitionIterator.hasNext(DataSourceRDD.scala:148)
+        at org.apache.spark.sql.execution.datasources.v2.MetricsIterator.hasNext(DataSourceRDD.scala:186)
+        at org.apache.spark.sql.execution.datasources.v2.DataSourceRDD$$anon$1.$anonfun$hasNext$1(DataSourceRDD.scala:72)
+        at org.apache.spark.sql.execution.datasources.v2.DataSourceRDD$$anon$1.$anonfun$hasNext$1$adapted(DataSourceRDD.scala:72)
+        at scala.Option.exists(Option.scala:406)
+        at org.apache.spark.sql.execution.datasources.v2.DataSourceRDD$$anon$1.hasNext(DataSourceRDD.scala:72)
+        at org.apache.spark.sql.execution.datasources.v2.DataSourceRDD$$anon$1.advanceToNextIter(DataSourceRDD.scala:103)
+        at org.apache.spark.sql.execution.datasources.v2.DataSourceRDD$$anon$1.hasNext(DataSourceRDD.scala:72)
+        at org.apache.spark.InterruptibleIterator.hasNext(InterruptibleIterator.scala:37)
+        at scala.collection.Iterator$$anon$9.hasNext(Iterator.scala:593)
+        at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage1.columnartorow_nextBatch_0$(Unknown Source)
+        at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage1.hashAgg_doAggregateWithoutKey_0$(Unknown Source)
+        at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage1.processNext(Unknown Source)
+        at org.apache.spark.sql.execution.BufferedRowIterator.hasNext(BufferedRowIterator.java:43)
+        at org.apache.spark.sql.execution.WholeStageCodegenEvaluatorFactory$WholeStageCodegenPartitionEvaluator$$anon$1.hasNext(WholeStageCodegenEvaluatorFactory.scala:50)
+        at scala.collection.Iterator$$anon$9.hasNext(Iterator.scala:593)
+        at org.apache.spark.shuffle.sort.BypassMergeSortShuffleWriter.write(BypassMergeSortShuffleWriter.java:153)
+        at org.apache.spark.shuffle.ShuffleWriteProcessor.write(ShuffleWriteProcessor.scala:57)
+        at org.apache.spark.scheduler.ShuffleMapTask.runTask(ShuffleMapTask.scala:111)
+        at org.apache.spark.scheduler.ShuffleMapTask.runTask(ShuffleMapTask.scala:54)
+        at org.apache.spark.TaskContext.runTaskWithListeners(TaskContext.scala:180)
+        at org.apache.spark.scheduler.Task.run(Task.scala:147)
+        at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$5(Executor.scala:716)
+        at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally(SparkErrorUtils.scala:86)
+        at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally$(SparkErrorUtils.scala:83)
+        at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:97)
+        at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:719)
+        at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+        at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+        at java.base/java.lang.Thread.run(Thread.java:840)
+  stream 0 [05/22] q06: 15.391s
+  stream 1 [05/22] q06: 19.981s
+  stream 2 [05/22] q06: 20.411s
+  stream 0 [06/22] q17: 37.202s
+  stream 1 [06/22] q17: 36.293s
+  stream 2 [06/22] q17: 42.109s
+  stream 0 [07/22] q18: 35.102s
+  stream 1 [07/22] q18: 33.868s
+  stream 2 [07/22] q18: 32.390s
+  stream 0 [08/22] q08: 23.341s
+  stream 1 [08/22] q08: 21.246s
+  stream 2 [08/22] q08: 22.863s
+  stream 0 [09/22] q21: 45.428s                                                 ]
+  stream 1 [09/22] q21: 46.055s
+  stream 2 [09/22] q21: 40.229s
+  stream 0 [10/22] q13: 8.403s
+  stream 1 [10/22] q13: 8.675s
+  stream 2 [10/22] q13: 7.818s
+  stream 0 [11/22] q03: 7.191s
+  stream 1 [11/22] q03: 5.706s
+  stream 2 [11/22] q03: 5.802s
+  stream 0 [12/22] q22: 2.834s
+  stream 1 [12/22] q22: 2.408s
+  stream 2 [12/22] q22: 2.430s
+  stream 0 [13/22] q16: 3.733s
+  stream 1 [13/22] q16: 2.975s
+  stream 2 [13/22] q16: 3.478s
+  stream 0 [14/22] q04: 4.675s
+  stream 1 [14/22] q04: 4.888s
+  stream 2 [14/22] q04: 3.405s
+  stream 1 [15/22] q11: 1.980s
+  stream 0 [15/22] q11: 2.201s
+  stream 2 [15/22] q11: 1.830s
+  stream 1 [16/22] q15: 4.747s
+  stream 0 [16/22] q15: 6.234s
+  stream 2 [16/22] q15: 6.191s
+  stream 1 [17/22] q01: 8.641s
+  stream 0 [17/22] q01: 14.568s
+  stream 1 [18/22] q10: 10.335s
+  stream 0 [18/22] q10: 4.510s
+  stream 1 [19/22] q19: 2.975s
+  stream 2 [17/22] q01: 20.622s
+  stream 0 [19/22] q19: 2.720s
+  stream 2 [18/22] q10: 5.880s
+  stream 1 [20/22] q05: 9.393s
+  stream 2 [19/22] q19: 4.099s
+  stream 0 [20/22] q05: 10.118s
+  stream 1 [21/22] q07: 9.354s
+  stream 2 [20/22] q05: 11.392s
+  stream 0 [21/22] q07: 10.169s
+  stream 1 [22/22] q12: 3.502s
+  stream 0 [22/22] q12: 3.310s
+  stream 2 [21/22] q07: 5.831s
+  stream 2 [22/22] q12: 1.965s
+  throughput interval = 304.66s
+  throughput_score    = 7798.87 QphH@10GB
+  QphH@10GB = 6171.06
+
+Monitor log: results/power_monitor_spark_sf10_20260416T150810.tsv
+
+Tearing down namespace 'bench_fb23ea0a'...
+
+Results written to results/spark_power_sf10_20260416T151636.json
