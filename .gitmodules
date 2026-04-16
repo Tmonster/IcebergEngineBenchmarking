@@ -1,0 +1,3 @@
+[submodule "duckdb-tpch-power-test"]
+	path = duckdb-tpch-power-test
+	url = git@github.com:duckdb/duckdb-tpch-power-test.git
