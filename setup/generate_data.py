@@ -144,6 +144,60 @@ def _convert_tbl_to_parquet(tbl_file: Path, out: Path, col_types: dict[str, str]
         """)
 
 
+QGEN_STREAMS_DIR = Path("queries/tpch/streams")
+
+
+def generate_query_streams(scale_factor: int, n_streams: int) -> None:
+    """
+    Generate per-stream SQL files using qgen.
+
+    Produces files in queries/tpch/streams/:
+      stream_0.sql   — power test permutation (qgen -p 0)
+      stream_1.sql   — throughput stream 1    (qgen -p 1)
+      ...
+      stream_N.sql   — throughput stream N    (qgen -p N)
+
+    Each file contains all 22 queries in the spec-defined permutation order
+    for that stream, with parameters substituted for the given scale factor.
+
+    Set n_streams to the number of throughput streams (use _spec_stream_count
+    from benchmarks.power to get the correct value for your SF).
+    """
+    _compile_dbgen()
+
+    qgen_bin = (DBGEN_DIR / "qgen").absolute()
+    if not qgen_bin.exists():
+        print(
+            f"error: qgen binary not found at {qgen_bin}. "
+            "Run `python -m setup.generate_data --refresh` first to compile dbgen.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    QGEN_STREAMS_DIR.mkdir(parents=True, exist_ok=True)
+    total = n_streams + 1  # stream 0 (power) + streams 1..n_streams (throughput)
+    print(f"Generating query streams (sf={scale_factor}, streams=0..{n_streams})...")
+
+    for stream_idx in range(total):
+        out_path = QGEN_STREAMS_DIR / f"stream_{stream_idx}.sql"
+        result = subprocess.run(
+            [str(qgen_bin), "-s", str(scale_factor), "-p", str(stream_idx)],
+            cwd=DBGEN_DIR,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        # Strip the seed comment line at the top
+        sql = "\n".join(
+            line for line in result.stdout.splitlines()
+            if not line.startswith("-- using") and not line.startswith("-- $")
+        )
+        out_path.write_text(sql)
+        print(f"  stream_{stream_idx}.sql → {out_path}")
+
+    print("Done.")
+
+
 def _compile_dbgen() -> None:
     dbgen_bin = DBGEN_DIR / "dbgen"
     if dbgen_bin.exists():
@@ -197,8 +251,28 @@ if __name__ == "__main__":
             "where update_streams = max(1, round(0.1 * sf)))"
         ),
     )
+    parser.add_argument(
+        "--query-streams",
+        action="store_true",
+        help=(
+            "Generate per-stream SQL files via qgen (queries/tpch/streams/stream_N.sql). "
+            "Each stream gets a different query permutation and parameter substitution "
+            "per the TPC-H spec. Required for a spec-compliant power/throughput benchmark."
+        ),
+    )
+    parser.add_argument(
+        "--n-streams", type=int, default=None,
+        help=(
+            "Number of throughput streams to generate query files for "
+            "(default: spec value for the given SF). Stream 0 (power test) is always included."
+        ),
+    )
     args = parser.parse_args()
     generate(scale_factor=args.sf, data_dir=args.data_dir)
     if args.refresh:
         n_sets = args.refresh_sets or (1 + max(1, round(0.1 * args.sf)))
         generate_refresh_data(scale_factor=args.sf, data_dir=args.data_dir, n_sets=n_sets)
+    if args.query_streams:
+        from benchmarks.power import _spec_stream_count
+        n_streams = args.n_streams or _spec_stream_count(args.sf)
+        generate_query_streams(scale_factor=args.sf, n_streams=n_streams)

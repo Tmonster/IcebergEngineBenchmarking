@@ -42,6 +42,7 @@ if TYPE_CHECKING:
 
 QUERY_DIR = Path("queries/tpch/queries")
 POWER_ORDER_FILE = Path("queries/tpch/power_order.txt")
+STREAMS_DIR = Path("queries/tpch/streams")
 
 # Spec-defined number of query streams for the throughput test (TPC-H section 5.3.4).
 _SPEC_STREAMS: dict[int, int] = {1: 2, 10: 3, 20: 3, 30: 4, 100: 5, 300: 6, 1000: 7, 3000: 8, 10000: 9}
@@ -199,13 +200,70 @@ def _fork_runner(runner: BenchmarkRunner) -> BenchmarkRunner:
 # Stream runner
 # ---------------------------------------------------------------------------
 
+def _split_stream_sql(sql: str) -> list[str]:
+    """
+    Split a qgen-produced stream file into individual query strings.
+    qgen separates queries with ';' and may emit comment lines.
+    Returns only non-empty statements that contain a SELECT.
+    """
+    return [
+        stmt.strip()
+        for stmt in sql.split(";")
+        if "select" in stmt.lower()
+    ]
+
+
 def run_stream(
     runner: BenchmarkRunner,
     namespace: str,
     stream_idx: int,
     order: list[int],
 ) -> list[QueryResult]:
-    """Run one query stream and return per-query results."""
+    """
+    Run one query stream and return per-query results.
+
+    If a qgen-generated stream file exists at queries/tpch/streams/stream_{stream_idx}.sql,
+    use it (spec-compliant permutation + parameter substitution). Otherwise fall back to
+    running the fixed-parameter queries in the order given by `order`.
+    """
+    stream_file = STREAMS_DIR / f"stream_{stream_idx}.sql"
+
+    if stream_file.exists():
+        return _run_stream_from_file(runner, namespace, stream_idx, stream_file)
+    else:
+        return _run_stream_from_order(runner, namespace, stream_idx, order)
+
+
+def _run_stream_from_file(
+    runner: BenchmarkRunner,
+    namespace: str,
+    stream_idx: int,
+    stream_file: Path,
+) -> list[QueryResult]:
+    """Run a stream from a qgen-generated SQL file (spec-compliant)."""
+    statements = _split_stream_sql(stream_file.read_text())
+    results: list[QueryResult] = []
+    for seq_idx, sql in enumerate(statements):
+        result = runner.time_query(
+            sql=sql,
+            query_name=f"q{seq_idx + 1:02d}",
+            benchmark="power",
+            namespace=namespace,
+            run=stream_idx,
+        )
+        results.append(result)
+        status = f"ERROR: {result.error}" if result.error else f"{result.elapsed_seconds:.3f}s"
+        print(f"  stream {stream_idx} [{seq_idx + 1:02d}/22] (stream file): {status}")
+    return results
+
+
+def _run_stream_from_order(
+    runner: BenchmarkRunner,
+    namespace: str,
+    stream_idx: int,
+    order: list[int],
+) -> list[QueryResult]:
+    """Run a stream using the fixed-parameter individual query files in the given order."""
     results: list[QueryResult] = []
     for seq_idx, q_num in enumerate(order):
         qfile = QUERY_DIR / f"q{q_num:02d}.sql"
@@ -280,7 +338,9 @@ def _run_throughput_test(
 
     def query_thread(idx: int) -> None:
         forked = _fork_runner(runner)
-        stream_results[idx] = run_stream(forked, namespace, stream_idx=idx, order=order)
+        # Throughput streams are 1-indexed: stream_1.sql .. stream_N.sql
+        # (stream_0.sql is reserved for the power test)
+        stream_results[idx] = run_stream(forked, namespace, stream_idx=idx + 1, order=order)
 
     def refresh_thread() -> None:
         forked_engine = runner.engine.fork_for_stream()
