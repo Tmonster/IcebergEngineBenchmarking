@@ -26,7 +26,7 @@ def attach_catalog(conn: duckdb.DuckDBPyConnection, catalog: "Catalog") -> str:
     if catalog_type == "ducklake":
         return _attach_ducklake(conn, props)
 
-    conn.execute("INSTALL iceberg; LOAD iceberg;")
+    conn.execute("INSTALL iceberg from core_nightly; LOAD iceberg;")
     conn.execute("INSTALL aws; LOAD aws;")
     conn.execute("INSTALL httpfs; LOAD httpfs;")
 
