@@ -42,7 +42,6 @@ if TYPE_CHECKING:
 
 QUERY_DIR = Path("queries/tpch/queries")
 POWER_ORDER_FILE = Path("queries/tpch/power_order.txt")
-STREAMS_DIR = Path("queries/tpch/streams")
 
 # Spec-defined number of query streams for the throughput test (TPC-H section 5.3.4).
 _SPEC_STREAMS: dict[int, int] = {1: 2, 10: 3, 20: 3, 30: 4, 100: 5, 300: 6, 1000: 7, 3000: 8, 10000: 9}
@@ -218,15 +217,16 @@ def run_stream(
     namespace: str,
     stream_idx: int,
     order: list[int],
+    streams_dir: Path,
 ) -> list[QueryResult]:
     """
     Run one query stream and return per-query results.
 
-    If a qgen-generated stream file exists at queries/tpch/streams/stream_{stream_idx}.sql,
+    If a qgen-generated stream file exists at streams_dir/stream_{stream_idx}.sql,
     use it (spec-compliant permutation + parameter substitution). Otherwise fall back to
     running the fixed-parameter queries in the order given by `order`.
     """
-    stream_file = STREAMS_DIR / f"stream_{stream_idx}.sql"
+    stream_file = streams_dir / f"stream_{stream_idx}.sql"
 
     if stream_file.exists():
         return _run_stream_from_file(runner, namespace, stream_idx, stream_file)
@@ -288,6 +288,7 @@ def _run_power_test(
     runner: BenchmarkRunner,
     namespace: str,
     data_dir: Path,
+    streams_dir: Path,
     order: list[int],
 ) -> tuple[list[QueryResult], RefreshResult | None, RefreshResult | None]:
     """RF1 → 1 query stream → RF2, all sequential."""
@@ -305,7 +306,7 @@ def _run_power_test(
         )
 
     print("  Starting power query stream...")
-    stream = run_stream(runner, namespace, stream_idx=0, order=order)
+    stream = run_stream(runner, namespace, stream_idx=0, order=order, streams_dir=streams_dir)
 
     if rf1 is not None:
         print("  Running RF2...")
@@ -324,6 +325,7 @@ def _run_throughput_test(
     runner: BenchmarkRunner,
     namespace: str,
     data_dir: Path,
+    streams_dir: Path,
     n_streams: int,
     update_streams: int,
     order: list[int],
@@ -340,7 +342,7 @@ def _run_throughput_test(
         forked = _fork_runner(runner)
         # Throughput streams are 1-indexed: stream_1.sql .. stream_N.sql
         # (stream_0.sql is reserved for the power test)
-        stream_results[idx] = run_stream(forked, namespace, stream_idx=idx + 1, order=order)
+        stream_results[idx] = run_stream(forked, namespace, stream_idx=idx + 1, order=order, streams_dir=streams_dir)
 
     def refresh_thread() -> None:
         forked_engine = runner.engine.fork_for_stream()
@@ -415,7 +417,9 @@ def run(
     Args:
         runner:          BenchmarkRunner with a set-up engine.
         namespace:       Iceberg namespace containing the TPC-H tables.
-        data_dir:        Directory containing local refresh parquet files.
+        data_dir:        SF-specific data directory (e.g. data/10). Expected to contain
+                         refresh parquet files and optionally a streams/ subdirectory
+                         with qgen-generated SQL files.
         update_streams:  Number of combined RF operations in the throughput refresh
                          thread. Defaults to max(1, round(0.1 * scale_factor)).
                          Tune this down if Iceberg catalog write contention is a
@@ -427,6 +431,8 @@ def run(
     n_streams = _spec_stream_count(sf)
     n_update = update_streams if update_streams is not None else _default_update_streams(sf)
 
+    streams_dir = data_dir / "streams"
+
     log_dir = monitor_log_dir or runner.result_dir
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
     monitor_log = log_dir / f"power_monitor_{runner.engine_name}_sf{sf}_{ts}.tsv"
@@ -434,6 +440,11 @@ def run(
     order = _load_power_order()
 
     print(f"  SF={sf} → {n_streams} throughput stream(s), {n_update} update stream(s)")
+    if streams_dir.exists():
+        print(f"  Using qgen stream files from {streams_dir}")
+    else:
+        print(f"  No stream files found in {streams_dir} — using fixed query order/parameters")
+        print(f"  (Run `python -m setup.generate_data --sf {sf} --query-streams` for spec-compliant streams)")
 
     monitor = StreamMonitor(log_path=monitor_log)
     monitor.start()
@@ -442,7 +453,7 @@ def run(
     try:
         # ---- Power test ----
         print("\n  [Power test]")
-        power_stream, rf1, rf2 = _run_power_test(runner, namespace, data_dir, order)
+        power_stream, rf1, rf2 = _run_power_test(runner, namespace, data_dir, streams_dir, order)
         power_score = _compute_power_score(power_stream, rf1, rf2, sf)
         if power_score is not None:
             print(f"  power_score = {power_score:.2f} QphH@{sf}GB")
@@ -450,7 +461,7 @@ def run(
         # ---- Throughput test ----
         print("\n  [Throughput test]")
         tp_streams, tp_refresh, tp_interval = _run_throughput_test(
-            runner, namespace, data_dir, n_streams, n_update, order
+            runner, namespace, data_dir, streams_dir, n_streams, n_update, order
         )
         throughput_score = _compute_throughput_score(n_streams, tp_interval, sf)
         print(f"  throughput interval = {tp_interval:.2f}s")

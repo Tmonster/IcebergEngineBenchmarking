@@ -80,7 +80,7 @@ _DUCKLAKE_ALIAS = "ducklake_catalog"
 def _attach_ducklake(conn: duckdb.DuckDBPyConnection, props: dict) -> str:
     conn.execute("INSTALL ducklake; LOAD ducklake;")
     # turn off external file cache so results are not hot from cache
-    conn.execute("pragma enable_external_file_cache=false")
+    # conn.execute("pragma enable_external_file_cache=false")
     metadata_path = props["metadata_path"]
     data_path = props["data_path"]
     Path(data_path).mkdir(parents=True, exist_ok=True)

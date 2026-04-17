@@ -39,7 +39,7 @@ def main() -> None:
 
     scale_factor = args.sf or bench_cfg["scale_factor"]
     namespace = args.namespace or f"bench_{uuid.uuid4().hex[:8]}"
-    data_dir = Path("data")
+    data_dir = Path("data") / f"sf={scale_factor}"
     result_dir = Path(bench_cfg["result_dir"])
 
     catalog = load_catalog(catalog_cfg)

@@ -29,24 +29,35 @@ class _DuckDBCursorEngine:
     def __init__(self, cursor: duckdb.DuckDBPyConnection, catalog_alias: str):
         self._cursor = cursor
         self._catalog_alias = catalog_alias
+        self._current_namespace: str | None = None
+
+    def _use(self, namespace: str) -> None:
+        if namespace != self._current_namespace:
+            self._cursor.execute(f"USE {self._catalog_alias}.{namespace}")
+            self._current_namespace = namespace
 
     def run_query(self, sql: str, namespace: str) -> tuple[list[tuple], list[str], int]:
-        self._cursor.execute(f"USE {self._catalog_alias}.{namespace};")
+        self._use(namespace)
+        self._cursor.execute("BEGIN TRANSACTION READ ONLY")
         rel = self._cursor.execute(sql)
+        self._cursor.execute("COMMIT")
         rows = rel.fetchall()
         col_names = [desc[0] for desc in rel.description]
         return rows, col_names, len(rows)
 
     def run_rf1(self, data_dir: Path, namespace: str, set_n: int) -> None:
-        self._cursor.execute(f"USE {self._catalog_alias}.{namespace};")
+        self._use(namespace)
         orders = str((data_dir / f"orders_u{set_n}.parquet").absolute())
         lineitem = str((data_dir / f"lineitem_u{set_n}.parquet").absolute())
+        self._cursor.begin()
         self._cursor.execute(f"INSERT INTO orders SELECT * FROM read_parquet('{orders}')")
         self._cursor.execute(f"INSERT INTO lineitem SELECT * FROM read_parquet('{lineitem}')")
+        self._cursor.commit()
 
     def run_rf2(self, data_dir: Path, namespace: str, set_n: int) -> None:
-        self._cursor.execute(f"USE {self._catalog_alias}.{namespace};")
+        self._use(namespace)
         delete_keys = str((data_dir / f"delete_set_{set_n}.parquet").absolute())
+        self._cursor.begin()
         self._cursor.execute(
             f"DELETE FROM orders WHERE o_orderkey IN "
             f"(SELECT o_orderkey FROM read_parquet('{delete_keys}'))"
@@ -55,6 +66,7 @@ class _DuckDBCursorEngine:
             f"DELETE FROM lineitem WHERE l_orderkey IN "
             f"(SELECT o_orderkey FROM read_parquet('{delete_keys}'))"
         )
+        self._cursor.commit()
 
     def fork_for_stream(self) -> "_DuckDBCursorEngine":
         return _DuckDBCursorEngine(self._cursor.cursor(), self._catalog_alias)
@@ -65,6 +77,12 @@ class DuckDBEngine(Engine):
         super().__init__(catalog)
         self._conn: duckdb.DuckDBPyConnection | None = None
         self._catalog_alias: str | None = None
+        self._current_namespace: str | None = None
+
+    def _use(self, namespace: str) -> None:
+        if namespace != self._current_namespace:
+            self._conn.execute(f"USE {self._catalog_alias}.{namespace}")
+            self._current_namespace = namespace
 
     def setup(self) -> None:
         self._conn = duckdb.connect()
@@ -82,25 +100,29 @@ class DuckDBEngine(Engine):
 
     def run_query(self, sql: str, namespace: str) -> tuple[list[tuple], list[str], int]:
         assert self._conn is not None, "Call setup() before run_query()"
-        # Set search path so unqualified table names in TPC-H SQL resolve correctly
-        self._conn.execute(f"USE {self._catalog_alias}.{namespace};")
+        self._use(namespace)
+        self._conn.execute("BEGIN TRANSACTION READ ONLY")
         relation = self._conn.execute(sql)
+        self._conn.execute("COMMIT")
         rows = relation.fetchall()
         col_names = [desc[0] for desc in relation.description]
         return rows, col_names, len(rows)
 
     def run_rf1(self, data_dir: Path, namespace: str, set_n: int) -> None:
         assert self._conn is not None, "Call setup() before run_rf1()"
-        self._conn.execute(f"USE {self._catalog_alias}.{namespace};")
+        self._use(namespace)
         orders = str((data_dir / f"orders_u{set_n}.parquet").absolute())
         lineitem = str((data_dir / f"lineitem_u{set_n}.parquet").absolute())
+        self._conn.begin()
         self._conn.execute(f"INSERT INTO orders SELECT * FROM read_parquet('{orders}')")
         self._conn.execute(f"INSERT INTO lineitem SELECT * FROM read_parquet('{lineitem}')")
+        self._conn.commit()
 
     def run_rf2(self, data_dir: Path, namespace: str, set_n: int) -> None:
         assert self._conn is not None, "Call setup() before run_rf2()"
-        self._conn.execute(f"USE {self._catalog_alias}.{namespace};")
+        self._use(namespace)
         delete_keys = str((data_dir / f"delete_set_{set_n}.parquet").absolute())
+        self._conn.begin()
         self._conn.execute(
             f"DELETE FROM orders WHERE o_orderkey IN "
             f"(SELECT o_orderkey FROM read_parquet('{delete_keys}'))"
@@ -109,6 +131,7 @@ class DuckDBEngine(Engine):
             f"DELETE FROM lineitem WHERE l_orderkey IN "
             f"(SELECT o_orderkey FROM read_parquet('{delete_keys}'))"
         )
+        self._conn.commit()
 
     def fork_for_stream(self) -> _DuckDBCursorEngine:
         assert self._conn is not None, "Call setup() before fork_for_stream()"

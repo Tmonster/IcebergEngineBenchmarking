@@ -144,14 +144,11 @@ def _convert_tbl_to_parquet(tbl_file: Path, out: Path, col_types: dict[str, str]
         """)
 
 
-QGEN_STREAMS_DIR = Path("queries/tpch/streams")
-
-
-def generate_query_streams(scale_factor: int, n_streams: int) -> None:
+def generate_query_streams(scale_factor: int, n_streams: int, data_dir: Path) -> None:
     """
     Generate per-stream SQL files using qgen.
 
-    Produces files in queries/tpch/streams/:
+    Produces files in data_dir/streams/:
       stream_0.sql   — power test permutation (qgen -p 0)
       stream_1.sql   — throughput stream 1    (qgen -p 1)
       ...
@@ -174,12 +171,13 @@ def generate_query_streams(scale_factor: int, n_streams: int) -> None:
         )
         sys.exit(1)
 
-    QGEN_STREAMS_DIR.mkdir(parents=True, exist_ok=True)
+    streams_dir = data_dir / "streams"
+    streams_dir.mkdir(parents=True, exist_ok=True)
     total = n_streams + 1  # stream 0 (power) + streams 1..n_streams (throughput)
     print(f"Generating query streams (sf={scale_factor}, streams=0..{n_streams})...")
 
     for stream_idx in range(total):
-        out_path = QGEN_STREAMS_DIR / f"stream_{stream_idx}.sql"
+        out_path = streams_dir / f"stream_{stream_idx}.sql"
         result = subprocess.run(
             [str(qgen_bin), "-s", str(scale_factor), "-p", str(stream_idx)],
             cwd=DBGEN_DIR,
@@ -238,7 +236,10 @@ def _compile_dbgen() -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--sf", type=int, default=1, help="TPC-H scale factor")
-    parser.add_argument("--data-dir", type=Path, default=Path("data"))
+    parser.add_argument(
+        "--data-dir", type=Path, default=None,
+        help="Base data directory (default: data/<sf>)",
+    )
     parser.add_argument(
         "--refresh",
         action="store_true",
@@ -255,7 +256,7 @@ if __name__ == "__main__":
         "--query-streams",
         action="store_true",
         help=(
-            "Generate per-stream SQL files via qgen (queries/tpch/streams/stream_N.sql). "
+            "Generate per-stream SQL files via qgen (data/<sf>/streams/stream_N.sql). "
             "Each stream gets a different query permutation and parameter substitution "
             "per the TPC-H spec. Required for a spec-compliant power/throughput benchmark."
         ),
@@ -268,11 +269,12 @@ if __name__ == "__main__":
         ),
     )
     args = parser.parse_args()
-    generate(scale_factor=args.sf, data_dir=args.data_dir)
+    data_dir = args.data_dir if args.data_dir is not None else Path("data") / f"sf={args.sf}"
+    generate(scale_factor=args.sf, data_dir=data_dir)
     if args.refresh:
         n_sets = args.refresh_sets or (1 + max(1, round(0.1 * args.sf)))
-        generate_refresh_data(scale_factor=args.sf, data_dir=args.data_dir, n_sets=n_sets)
+        generate_refresh_data(scale_factor=args.sf, data_dir=data_dir, n_sets=n_sets)
     if args.query_streams:
         from benchmarks.power import _spec_stream_count
         n_streams = args.n_streams or _spec_stream_count(args.sf)
-        generate_query_streams(scale_factor=args.sf, n_streams=n_streams)
+        generate_query_streams(scale_factor=args.sf, n_streams=n_streams, data_dir=data_dir)
