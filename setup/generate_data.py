@@ -226,8 +226,8 @@ def generate_refresh_data(scale_factor: int, data_dir: Path, n_sets: int = 1) ->
     try:
         for n in range(1, n_sets + 1):
             tbl_files = [
-                (DBGEN_DIR / f"orders.tbl.u{n}",  data_dir / f"orders_u{n}.parquet",    _ORDERS_COLS),
-                (DBGEN_DIR / f"lineitem.tbl.u{n}", data_dir / f"lineitem_u{n}.parquet",  _LINEITEM_COLS),
+                (DBGEN_DIR / f"orders.tbl.u{n}",  data_dir / f"orders_u{n}.parquet",    _TABLE_COLS["orders"]),
+                (DBGEN_DIR / f"lineitem.tbl.u{n}", data_dir / f"lineitem_u{n}.parquet",  _TABLE_COLS["lineitem"]),
                 (DBGEN_DIR / f"delete.{n}",        data_dir / f"delete_set_{n}.parquet", _DELETE_COLS),
             ]
             for tbl_file, out, col_types in tbl_files:
