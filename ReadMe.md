@@ -1,211 +1,189 @@
-Sort of Vibe coded benchmark
+# Iceberg Engine Benchmarking
 
+TPC-H power and analytical benchmarks for Iceberg table engines (DuckDB and Spark), with support for multiple catalog backends.
 
-### Setup benchmark
+## Supported engines and catalogs
 
+| Engine | s3tables | local (PyIceberg) | DuckLake |
+|--------|----------|-------------------|----------|
+| DuckDB | ✓ | ✓ | ✓ |
+| Spark  | ✓ | ✗ | ✗ |
 
-### Machine Setup (e.g if running on EC2)
+## Prerequisites
 
-The commands below will mount physical storage of an EC2 to prevent spill data getting interference from EBS.
-This command is also available using `./setup/mount.sh`
-Commands.
+- Python 3.11+
+- [uv](https://github.com/astral-sh/uv)
+- Java 11+ (Spark only)
+- AWS credentials configured (s3tables only)
+
+## Installation
+
+```bash
+# DuckDB only
+uv sync
+
+# DuckDB + Spark
+uv sync --extra spark
 ```
+
+## Machine setup (EC2)
+
+When running on an EC2 instance with NVMe storage, mount the physical drive to avoid Spark spill competing with EBS I/O. The script below finds the largest unmounted NVMe device and mounts it, then clones the repo onto it.
+
+```bash
 mount_name=$(sudo lsblk | awk '
 NR > 1 && $1 ~ /^nvme/ && $7 == "" {
-    # Convert SIZE column to bytes for comparison
-    size = $4;
-    unit = substr(size, length(size));
-    value = substr(size, 1, length(size)-1);
+    size = $4; unit = substr(size, length(size)); value = substr(size, 1, length(size)-1);
     if (unit == "G") { value *= 1024^3; }
     else if (unit == "T") { value *= 1024^4; }
     else if (unit == "M") { value *= 1024^2; }
     else if (unit == "K") { value *= 1024; }
-    else { value *= 1; }
-
-    # Keep track of the largest size
-    if (value > max) {
-        max = value;
-        largest = $1;
-    }
+    if (value > max) { max = value; largest = $1; }
 }
-END { if (largest) print largest; else print "No match found"; }
-')
+END { if (largest) print largest; }')
 
 sudo mkfs -t xfs /dev/$mount_name
-
-sudo rm -rf $HOME/benchmark_mount
-sudo mkdir $HOME/benchmark_mount
+sudo mkdir -p $HOME/benchmark_mount
 sudo mount /dev/$mount_name $HOME/benchmark_mount
-
-# make clone of repo on mount
-sudo mkdir $HOME/benchmark_mount/IcebergEngineBenchmarking
 sudo chown -R ubuntu:ubuntu $HOME/benchmark_mount
-
 
 git clone https://github.com/Tmonster/IcebergEngineBenchmarking.git $HOME/benchmark_mount/IcebergEngineBenchmarking
 cd $HOME/benchmark_mount/IcebergEngineBenchmarking
 ```
 
-#### Notes on Spark setup
-1. The spill area for spark is on the mount and is relative to the benchmark dir
-2. The driver memory size is set to 25G (feel free to modify if needed)
-3. The default delete strategy is merge on read. Copy on write is costly for power benchmark, and I have encountered errors.
+This is also available as `./setup/mount.sh`.
 
+## Configuration
 
-### Benchmark Setup  
+### Catalog (`config/catalog.yml`)
 
-Run installs with uv
-```
-uv synv --extra duckdb --extra spark
-```
-
-Generate all data for the scale factor you want. This will use duckdb to generate the base tables in parquet form, and the tpch gen library to generate the update & delete files. 
-```
-uv run python -m setup.generate_data --sf {{sf}} --refresh
+**AWS S3 Tables:**
+```yaml
+type: s3tables
+region: eu-central-1
+account_id: "123456789012"
+bucket: my-s3-tables-bucket
+namespace: benchmarks
 ```
 
-#### Analytical Benchmark
-If you have generating data, you can run the command below
-
-```
-uv run python3 run_benchmark.py --engine spark --benchmark analytical --keep-tables --namespace tpch_sf1 --sf 1
-````
-
-For the analytical benchmark, there are no updates or deletes that happen, so we want to keep the tables, hence `--keep-tables`
-
-If you already have a namespace with the tables at the desired scale factor you can run 
-
-```
-uv run python3 run_benchmark.py --engine spark --benchmark analytical --keep-tables --skip-datagen --namespace tpch_sf1 --sf 1
-````
-
-
-#### Power Benchmark
-You can run the power benchmark with the following script.
-```
-uv run python run_benchmark.py --engine spark --benchmark power --sf {{sf}}
-```
-This will provision a new namespace, upload the data at the scale factor, and run the power benchmark.
-
-
-### Notes when benchmarking
-
-##### Spark
-
-
-I got this error during the Power Test.
-
-```
-  Running RF1 (insert refresh data)...
-SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
-SLF4J: Defaulting to no-operation (NOP) logger implementation
-SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
-  RF1 done: 5.378s
-  Starting query stream 0...
-  stream 0 [01/22] q14: 10.726s
-  stream 0 [02/22] q02: 5.737s
-  stream 0 [03/22] q09: 11.086s
-  stream 0 [04/22] q20: 7.895s
-  stream 0 [05/22] q06: 5.746s
-  stream 0 [06/22] q17: 9.866s
-  stream 0 [07/22] q18: 10.063s
-  stream 0 [08/22] q08: 9.144s
-  stream 0 [09/22] q21: 17.627s
-  stream 0 [10/22] q13: 4.926s
-  stream 0 [11/22] q03: 12.626s
-  stream 0 [12/22] q22: 2.355s
-  stream 0 [13/22] q16: 4.189s
-  stream 0 [14/22] q04: 5.150s
-  stream 0 [15/22] q11: 4.804s
-  stream 0 [16/22] q15: 11.379s
-  stream 0 [17/22] q01: 5.421s
-  stream 0 [18/22] q10: 8.777s
-  stream 0 [19/22] q19: 11.023s
-  stream 0 [20/22] q05: 9.632s
-  stream 0 [21/22] q07: 8.765s
-  stream 0 [22/22] q12: 8.450s
-  Running RF2 (delete refresh data)...
-26/04/16 14:24:28 ERROR ReplaceDataExec: Data source write support IcebergBatchWrite(table=s3tablesbucket.bench_b2d74d02.lineitem, format=PARQUET) is aborting.
-26/04/16 14:24:28 ERROR ReplaceDataExec: Data source write support IcebergBatchWrite(table=s3tablesbucket.bench_b2d74d02.lineitem, format=PARQUET) aborted.
-  RF2 done: ERROR: An error occurred while calling o48.sql.
-: org.apache.iceberg.exceptions.ValidationException: Missing required files to delete: s3://7c4db751-8784-48c4-pkusg9wff4xghasdoz1h5gbzt4x5heuc1b--table-s3/data/019d963a-84f0-7cfd-abf4-1e4d7da205e7.parquet
-	at org.apache.iceberg.exceptions.ValidationException.check(ValidationException.java:49)
-	at org.apache.iceberg.ManifestFilterManager.validateRequiredDeletes(ManifestFilterManager.java:278)
-	at org.apache.iceberg.ManifestFilterManager.filterManifests(ManifestFilterManager.java:228)
-	at org.apache.iceberg.MergingSnapshotProducer.apply(MergingSnapshotProducer.java:925)
-	at org.apache.iceberg.BaseOverwriteFiles.apply(BaseOverwriteFiles.java:31)
-	at org.apache.iceberg.SnapshotProducer.apply(SnapshotProducer.java:261)
-	at org.apache.iceberg.BaseOverwriteFiles.apply(BaseOverwriteFiles.java:31)
-	at org.apache.iceberg.SnapshotProducer.lambda$commit$2(SnapshotProducer.java:440)
-	at org.apache.iceberg.util.Tasks$Builder.runTaskWithRetry(Tasks.java:413)
-	at org.apache.iceberg.util.Tasks$Builder.runSingleThreaded(Tasks.java:219)
-	at org.apache.iceberg.util.Tasks$Builder.run(Tasks.java:203)
-	at org.apache.iceberg.util.Tasks$Builder.run(Tasks.java:196)
-	at org.apache.iceberg.SnapshotProducer.commit(SnapshotProducer.java:438)
-	at org.apache.iceberg.BaseOverwriteFiles.commit(BaseOverwriteFiles.java:31)
-	at org.apache.iceberg.spark.source.SparkWrite.commitOperation(SparkWrite.java:238)
-	at org.apache.iceberg.spark.source.SparkWrite$CopyOnWriteOperation.commitWithSerializableIsolation(SparkWrite.java:490)
-	at org.apache.iceberg.spark.source.SparkWrite$CopyOnWriteOperation.commit(SparkWrite.java:453)
+**DuckLake (local, DuckDB only):**
+```yaml
+type: ducklake
+namespace: benchmarks
+metadata_path: ducklake/tpch.ducklake
+data_path: ducklake/files
 ```
 
-I have not tried to target the issue, but it seems like spark or S3Tables are not communicating correctly.
-This has also prompted me to make sure spark only performs a merge-on-read deletion strategy.
-
-
-At one point I triggered the following. Can't quiet remember the setup. But this goes to show how difficult setting up spark can be.
-```
-26/04/15 13:27:35 WARN GarbageCollectionMetrics: To enable non-built-in garbage collector(s) List(G1 Concurrent GC), users should configure it(them) to spark.eventLog.gcMetrics.youngGenerationGarbageCollectors or spark.eventLog.gcMetrics.oldGenerationGarbageCollectors
-
-#
-# A fatal error has been detected by the Java Runtime Environment:
-#
-#  SIGSEGV (0xb) at pc=0x0000f3d69225a018, pid=5686, tid=5883
-#
-# JRE version: OpenJDK Runtime Environment (21.0.10+7) (build 21.0.10+7-Ubuntu-124.04)
-# Java VM: OpenJDK 64-Bit Server VM (21.0.10+7-Ubuntu-124.04, mixed mode, sharing, tiered, compressed oops, compressed class ptrs, g1 gc, linux-aarch64)
-# Problematic frame:
-# V  [libjvm.so+0xc3a018]  oopDesc::metadata_field(int) const+0x14
-#
-# Core dump will be written. Default location: Core dumps may be processed with "/usr/share/apport/apport -p%p -s%s -c%c -d%d -P%P -u%u -g%g -F%F -- %E" (or dumping to /home/ubuntu/IcebergEngineBenchmarking/core.5686)
-#
-# An error report file with more information is saved as:
-# /home/ubuntu/IcebergEngineBenchmarking/hs_err_pid5686.log
-[23.629s][warning][os] Loading hsdis library failed
-#
-# If you would like to submit a bug report, please visit:
-#   https://bugs.launchpad.net/ubuntu/+source/openjdk-21
-#
+**Local PyIceberg (DuckDB only):**
+```yaml
+type: local
+namespace: benchmarks
+warehouse_path: warehouse/
 ```
 
+### Benchmark (`config/benchmark.yml`)
 
-Also encountered the following when running a power test for spark. This was for sf10
-```
-  [Power test]
-  Running RF1...
-SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
-SLF4J: Defaulting to no-operation (NOP) logger implementation
-SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
-  RF1: 5.919s
-  Starting power query stream...
-  stream 0 [01/22] q14: 9.357s
-  stream 0 [02/22] q02: 3.588s
-26/04/16 14:28:56 WARN S3InputStream: Retrying read from S3, reopening stream (attempt 1)
-26/04/16 14:28:56 WARN S3InputStream: An error occurred while aborting the stream
-software.amazon.awssdk.core.exception.RetryableException: Data read has a different checksum than expected. Was 0x6aaf3e926fe7fc3e7dd74f260df7bc92, but expected 0x00000000000000000000000000000000. This commonly means that the data was corrupted between the client and service.
-        at software.amazon.awssdk.core.exception.RetryableException$BuilderImpl.build(RetryableException.java:99)
-        at software.amazon.awssdk.core.exception.RetryableException.create(RetryableException.java:35)
-        at software.amazon.awssdk.services.s3.internal.checksums.S3ChecksumValidatingInputStream.validateAndThrow(S3ChecksumValidatingInputStream.java:172)
-        at software.amazon.awssdk.services.s3.internal.checksums.S3ChecksumValidatingInputStream.read(S3ChecksumValidatingInputStream.java:84)
-        at java.base/java.io.FilterInputStream.read(FilterInputStream.java:82)
-        at software.amazon.awssdk.core.io.SdkFilterInputStream.read(SdkFilterInputStream.java:60)
-        at software.amazon.awssdk.core.internal.metrics.BytesReadTrackingInputStream.read(BytesReadTrackingInputStream.java:42)
-        at java.base/java.io.FilterInputStream.read(FilterInputStream.java:82)
-        at software.amazon.awssdk.core.io.SdkFilterInputStream.read(SdkFilterInputStream.java:60)
-        at org.apache.iceberg.aws.s3.S3InputStream.abortStream(S3InputStream.java:281)
-        at org.apache.iceberg.aws.s3.S3InputStream.closeStream(S3InputStream.java:259)
-        at org.apache.iceberg.aws.s3.S3InputStream.openStream(S3InputStream.java:241)
+```yaml
+scale_factor: 10
+warmup_runs: 1
+benchmark_runs: 3
+result_dir: results/
 ```
 
+## Data generation
 
-I need to tune the memory size for Java. 
-On an EC2 
+Generate TPC-H base tables for a given scale factor. Data is stored in `data/sf=<N>/`.
+
+```bash
+# Base tables only
+uv run python -m setup.generate_data --sf 10
+
+# Base tables + RF1/RF2 refresh files (required for power benchmark)
+uv run python -m setup.generate_data --sf 10 --refresh
+
+# Base tables + refresh files + spec-compliant per-stream query files
+uv run python -m setup.generate_data --sf 10 --refresh --query-streams
+```
+
+`--query-streams` uses `qgen` to generate a different query permutation and parameter substitution for each stream, matching the TPC-H spec. Without it, the power benchmark falls back to a fixed query order and hardcoded parameters.
+
+## Running benchmarks
+
+### Load benchmark
+
+Times how long it takes to provision the TPC-H tables into the catalog. This benchmark performs the data load itself — do not use `--skip-datagen`.
+
+```bash
+uv run python run_benchmark.py --engine duckdb --benchmark load --sf 10
+```
+
+### Analytical benchmark
+
+Runs the 22 TPC-H queries with configurable warmup and benchmark repetitions. No refresh functions. Results are written to `results/`.
+
+```bash
+# Provision data and run
+uv run python run_benchmark.py --engine duckdb --benchmark analytical --sf 10
+
+# Re-use an existing namespace (skip data generation)
+uv run python run_benchmark.py --engine duckdb --benchmark analytical --sf 10 \
+    --skip-datagen --namespace my_namespace --keep-tables
+```
+
+`--keep-tables` prevents the namespace from being dropped after the run, useful when you want to run multiple engines against the same data.
+
+### Power benchmark
+
+Runs the TPC-H power test: RF1 → single query stream → RF2 (sequential). Computes the power score. Requires refresh data — generate with `--refresh`.
+
+```bash
+uv run python run_benchmark.py --engine duckdb --benchmark power --sf 10
+```
+
+### Throughput benchmark
+
+Runs N parallel query streams alongside a refresh thread. Computes the throughput score. The number of streams is determined by the TPC-H spec (e.g. 3 streams at SF=10). The number of refresh sets defaults to `max(1, round(0.1 * SF))`.
+
+```bash
+uv run python run_benchmark.py --engine duckdb --benchmark throughput --sf 10
+```
+
+### Composite benchmark
+
+Runs the full TPC-H composite metric: power test followed by throughput test. Computes power score, throughput score, and the official QphH composite score (`sqrt(power_score * throughput_score)`).
+
+```bash
+uv run python run_benchmark.py --engine duckdb --benchmark composite --sf 10
+```
+
+With a non-default catalog config:
+```bash
+uv run python run_benchmark.py --engine duckdb --benchmark composite --sf 10 \
+    --catalog-config config/ducklake_local.yml
+```
+
+### Plotting results
+
+```bash
+uv run --extra plot python plot_results.py results/duckdb_power_sf10_*.json results/spark_power_sf10_*.json
+```
+
+## Benchmark flags
+
+| Flag | Description |
+|------|-------------|
+| `--engine` | `duckdb` or `spark` |
+| `--benchmark` | `load`, `analytical`, `power`, `throughput`, or `composite` |
+| `--sf` | Scale factor (overrides `benchmark.yml`) |
+| `--catalog-config` | Path to catalog config (default: `config/catalog.yml`) |
+| `--namespace` | Namespace name (default: auto-generated) |
+| `--keep-tables` | Skip namespace teardown after run |
+| `--skip-datagen` | Skip data provisioning, use existing namespace (requires `--namespace`; not applicable to `load`) |
+| `--update-streams` | Number of refresh sets in the throughput/composite test (default: `max(1, round(0.1 * SF))`) |
+
+## Spark notes
+
+- **Spill directory** — set to `./spark-spill` relative to the working directory. Change `spark.local.dir` in `engines/spark/catalog_adapters.py` if needed.
+- **Driver/executor memory** — set to 25 GB. Adjust in `catalog_adapters.py` for your instance.
+- **Delete strategy** — configured as merge-on-read. Copy-on-write causes `ValidationException: Missing required files to delete` on S3 Tables due to background file optimization rewriting Parquet files between DELETE planning and commit.
+- **Scheduler** — `spark.scheduler.mode=FAIR` is required for the throughput test so parallel query streams actually run concurrently rather than queuing.
