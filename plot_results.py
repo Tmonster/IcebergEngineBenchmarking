@@ -18,20 +18,28 @@ import pandas as pd
 import seaborn as sns
 
 
-def load(paths: list[Path]) -> pd.DataFrame:
+def load(paths: list[Path]) -> tuple[pd.DataFrame, dict[str, float]]:
     frames = []
     for p in paths:
         rows = json.loads(p.read_text())
         frames.append(pd.DataFrame(rows))
     df = pd.concat(frames, ignore_index=True)
-    # Drop errored rows — they have no meaningful elapsed time
-    df = df[df["error"].isna()].copy()
-    # Label for legend: engine + scale factor
     df["label"] = df["engine"] + " sf" + df["scale_factor"].astype(str)
-    return df
+
+    # Extract power scores before filtering (power_score rows have elapsed_seconds=None)
+    power_scores: dict[str, float] = {}
+    if "power_score" in df.columns:
+        score_rows = df[df["query"] == "power_score"]
+        for _, row in score_rows.iterrows():
+            if pd.notna(row.get("power_score")):
+                power_scores[row["label"]] = row["power_score"]
+
+    # Keep only rows with a valid elapsed time and no error
+    df = df[(df["query"] != "power_score") & df["error"].isna() & df["elapsed_seconds"].notna()].copy()
+    return df, power_scores
 
 
-def plot(df: pd.DataFrame, output: Path | None) -> None:
+def plot(df: pd.DataFrame, power_scores: dict[str, float], output: Path | None) -> None:
     labels = sorted(df["label"].unique())
     queries = sorted(df["query"].unique())
 
@@ -53,7 +61,12 @@ def plot(df: pd.DataFrame, output: Path | None) -> None:
         ax=ax,
     )
 
-    ax.set_title("Query latency by engine (median, min/max across runs)")
+    title = "Query latency by engine (median, min/max across runs)"
+    if power_scores:
+        score_parts = [f"{label}: {score:,.2f} QphH" for label, score in sorted(power_scores.items())]
+        title += "\nPower score — " + " | ".join(score_parts)
+
+    ax.set_title(title)
     ax.set_xlabel("Query")
     ax.set_ylabel("Elapsed (s)")
     ax.legend(title="Engine", bbox_to_anchor=(1.01, 1), loc="upper left")
@@ -78,12 +91,12 @@ def main() -> None:
             print(f"error: file not found: {f}", file=sys.stderr)
         sys.exit(1)
 
-    df = load(args.files)
+    df, power_scores = load(args.files)
     if df.empty:
         print("No successful results found in the provided files.", file=sys.stderr)
         sys.exit(1)
 
-    plot(df, args.output)
+    plot(df, power_scores, args.output)
 
 
 if __name__ == "__main__":

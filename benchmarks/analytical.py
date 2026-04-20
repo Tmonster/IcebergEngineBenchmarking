@@ -6,6 +6,9 @@ Verification (if answer files exist) runs on the first timed run only.
 """
 from __future__ import annotations
 
+import functools
+import operator
+import statistics
 from pathlib import Path
 
 from benchmarks.runner import BenchmarkRunner, QueryResult
@@ -64,4 +67,26 @@ def run(
 
             print(f"  {query_name} run {run_idx}: {' '.join(status_parts)}")
 
+    _print_score(results, scale_factor)
     return results
+
+
+def _print_score(results: list[QueryResult], scale_factor: int) -> None:
+    """
+    Print a power-like score using the median time per query across runs.
+    Uses the same geometric-mean formula as the TPC-H power score but without
+    RF1/RF2 (not applicable to the analytical benchmark).
+    """
+    from collections import defaultdict
+    by_query: dict[str, list[float]] = defaultdict(list)
+    for r in results:
+        if not r.error:
+            by_query[r.query].append(r.elapsed_seconds)
+
+    if len(by_query) != 22:
+        return
+
+    medians = [statistics.median(times) for times in by_query.values()]
+    product = functools.reduce(operator.mul, medians)
+    score = round((3600 * scale_factor) / (product ** (1 / 22)), 2)
+    print(f"\n  analytical_score = {score:.2f} QphH@{scale_factor}GB (geo mean of median query times, no RF)")

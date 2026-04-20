@@ -84,9 +84,12 @@ class BenchmarkRunner:
         )
 
     def write_results(self, results: list[QueryResult], tag: str) -> Path:
+        return self.write_json([asdict(r) for r in results], tag)
+
+    def write_json(self, records: list[dict], tag: str) -> Path:
         ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
         out = self.result_dir / f"{self.engine_name}_{tag}_sf{self.scale_factor}_{ts}.json"
-        out.write_text(json.dumps([asdict(r) for r in results], indent=2))
+        out.write_text(json.dumps(records, indent=2))
         return out
 
     def _verify(self, rows: list[tuple], answer_path: Path) -> bool | None:
