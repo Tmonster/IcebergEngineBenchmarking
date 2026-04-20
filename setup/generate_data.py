@@ -6,10 +6,14 @@ Usage:
     python -m setup.generate_data --sf 10
     python -m setup.generate_data --sf 10 --refresh   # also generate RF parquet files
     python -m setup.generate_data --sf 1 --data-dir /tmp/tpch
+
+    # Large scale factors that exhaust memory with the in-memory path:
+    python -m setup.generate_data --sf 300 --chunks 10
 """
 from __future__ import annotations
 
 import argparse
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -21,58 +25,174 @@ TPCH_TABLES = [
     "part", "partsupp", "region", "supplier",
 ]
 
+# Tables that do NOT scale with SF — dbgen emits the same rows for every chunk.
+# We only convert these from chunk 1 and skip subsequent chunks.
+_FIXED_TABLES = {"nation", "region"}
+
 DBGEN_DIR = Path("duckdb-tpch-power-test/tpch_tools_3.0.1/dbgen")
 
 # TBL files have a trailing | delimiter, so there is always one extra empty column.
 # Column definitions map name → DuckDB type to match the base table schemas exactly.
-_ORDERS_COLS: dict[str, str] = {
-    "o_orderkey": "BIGINT",
-    "o_custkey": "BIGINT",
-    "o_orderstatus": "VARCHAR",
-    "o_totalprice": "DECIMAL(15,2)",
-    "o_orderdate": "DATE",
-    "o_orderpriority": "VARCHAR",
-    "o_clerk": "VARCHAR",
-    "o_shippriority": "INTEGER",
-    "o_comment": "VARCHAR",
+_TABLE_COLS: dict[str, dict[str, str]] = {
+    "customer": {
+        "c_custkey": "BIGINT",
+        "c_name": "VARCHAR",
+        "c_address": "VARCHAR",
+        "c_nationkey": "INTEGER",
+        "c_phone": "VARCHAR",
+        "c_acctbal": "DECIMAL(15,2)",
+        "c_mktsegment": "VARCHAR",
+        "c_comment": "VARCHAR",
+    },
+    "lineitem": {
+        "l_orderkey": "BIGINT",
+        "l_partkey": "BIGINT",
+        "l_suppkey": "BIGINT",
+        "l_linenumber": "INTEGER",
+        "l_quantity": "DECIMAL(15,2)",
+        "l_extendedprice": "DECIMAL(15,2)",
+        "l_discount": "DECIMAL(15,2)",
+        "l_tax": "DECIMAL(15,2)",
+        "l_returnflag": "VARCHAR",
+        "l_linestatus": "VARCHAR",
+        "l_shipdate": "DATE",
+        "l_commitdate": "DATE",
+        "l_receiptdate": "DATE",
+        "l_shipinstruct": "VARCHAR",
+        "l_shipmode": "VARCHAR",
+        "l_comment": "VARCHAR",
+    },
+    "nation": {
+        "n_nationkey": "INTEGER",
+        "n_name": "VARCHAR",
+        "n_regionkey": "INTEGER",
+        "n_comment": "VARCHAR",
+    },
+    "orders": {
+        "o_orderkey": "BIGINT",
+        "o_custkey": "BIGINT",
+        "o_orderstatus": "VARCHAR",
+        "o_totalprice": "DECIMAL(15,2)",
+        "o_orderdate": "DATE",
+        "o_orderpriority": "VARCHAR",
+        "o_clerk": "VARCHAR",
+        "o_shippriority": "INTEGER",
+        "o_comment": "VARCHAR",
+    },
+    "part": {
+        "p_partkey": "BIGINT",
+        "p_name": "VARCHAR",
+        "p_mfgr": "VARCHAR",
+        "p_brand": "VARCHAR",
+        "p_type": "VARCHAR",
+        "p_size": "INTEGER",
+        "p_container": "VARCHAR",
+        "p_retailprice": "DECIMAL(15,2)",
+        "p_comment": "VARCHAR",
+    },
+    "partsupp": {
+        "ps_partkey": "BIGINT",
+        "ps_suppkey": "BIGINT",
+        "ps_availqty": "INTEGER",
+        "ps_supplycost": "DECIMAL(15,2)",
+        "ps_comment": "VARCHAR",
+    },
+    "region": {
+        "r_regionkey": "INTEGER",
+        "r_name": "VARCHAR",
+        "r_comment": "VARCHAR",
+    },
+    "supplier": {
+        "s_suppkey": "BIGINT",
+        "s_name": "VARCHAR",
+        "s_address": "VARCHAR",
+        "s_nationkey": "INTEGER",
+        "s_phone": "VARCHAR",
+        "s_acctbal": "DECIMAL(15,2)",
+        "s_comment": "VARCHAR",
+    },
 }
-_LINEITEM_COLS: dict[str, str] = {
-    "l_orderkey": "BIGINT",
-    "l_partkey": "BIGINT",
-    "l_suppkey": "BIGINT",
-    "l_linenumber": "INTEGER",
-    "l_quantity": "DECIMAL(15,2)",
-    "l_extendedprice": "DECIMAL(15,2)",
-    "l_discount": "DECIMAL(15,2)",
-    "l_tax": "DECIMAL(15,2)",
-    "l_returnflag": "VARCHAR",
-    "l_linestatus": "VARCHAR",
-    "l_shipdate": "DATE",
-    "l_commitdate": "DATE",
-    "l_receiptdate": "DATE",
-    "l_shipinstruct": "VARCHAR",
-    "l_shipmode": "VARCHAR",
-    "l_comment": "VARCHAR",
-}
+
 # delete.N files: one o_orderkey per line with trailing |
 _DELETE_COLS: dict[str, str] = {
     "o_orderkey": "BIGINT",
 }
 
 
-def generate(scale_factor: int, data_dir: Path) -> None:
+def generate(scale_factor: int, data_dir: Path, n_chunks: int = 1) -> None:
     data_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Generating TPC-H data at scale factor {scale_factor}...")
+    if n_chunks > 1:
+        _generate_chunked(scale_factor, data_dir, n_chunks)
+    else:
+        _generate_in_memory(scale_factor, data_dir)
 
+
+def _generate_in_memory(scale_factor: int, data_dir: Path) -> None:
+    print(f"Generating TPC-H data at scale factor {scale_factor}...")
     with duckdb.connect() as conn:
         conn.execute("INSTALL tpch; LOAD tpch;")
         conn.execute(f"CALL dbgen(sf={scale_factor});")
-
         for table in TPCH_TABLES:
             out = data_dir / f"{table}.parquet"
             conn.execute(f"COPY {table} TO '{out}' (FORMAT PARQUET);")
             row_count = conn.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
             print(f"  {table}: {row_count:,} rows → {out}")
+    print("Done.")
+
+
+def _generate_chunked(scale_factor: int, data_dir: Path, n_chunks: int) -> None:
+    """
+    Generate base tables in n_chunks sequential passes using the dbgen binary.
+    Each pass produces one slice of the scalable tables. The slices are written
+    as individual parquet files and then merged into a single file per table via
+    DuckDB streaming COPY (no full-dataset memory spike).
+
+    nation and region do not scale with SF — dbgen emits identical rows for every
+    chunk, so they are only converted on chunk 1.
+    """
+    _compile_dbgen()
+    dbgen_bin = (DBGEN_DIR / "dbgen").absolute()
+
+    chunk_dir = data_dir / "_chunks"
+    chunk_dir.mkdir(parents=True, exist_ok=True)
+
+    print(f"Generating TPC-H SF={scale_factor} in {n_chunks} chunks via dbgen binary...")
+    try:
+        for chunk in range(1, n_chunks + 1):
+            print(f"  chunk {chunk}/{n_chunks}...")
+            subprocess.run(
+                [str(dbgen_bin), "-s", str(scale_factor), "-C", str(n_chunks), "-S", str(chunk), "-f"],
+                cwd=DBGEN_DIR,
+                check=True,
+                stdout=subprocess.DEVNULL,
+            )
+            for table in TPCH_TABLES:
+                tbl_file = DBGEN_DIR / f"{table}.tbl"
+                if not tbl_file.exists():
+                    continue
+                # nation/region are identical every chunk — only keep chunk 1
+                if table in _FIXED_TABLES and chunk > 1:
+                    tbl_file.unlink()
+                    continue
+                dest = chunk_dir / f"{table}_chunk_{chunk:04d}.parquet"
+                _convert_tbl_to_parquet(tbl_file, dest, _TABLE_COLS[table])
+                tbl_file.unlink()
+
+        print("  Merging chunks into final parquet files...")
+        with duckdb.connect() as conn:
+            for table in TPCH_TABLES:
+                chunk_files = sorted(chunk_dir.glob(f"{table}_chunk_*.parquet"))
+                if not chunk_files:
+                    continue
+                out = data_dir / f"{table}.parquet"
+                file_list = str([str(f) for f in chunk_files])
+                conn.execute(
+                    f"COPY (SELECT * FROM read_parquet({file_list})) TO '{out}' (FORMAT PARQUET);"
+                )
+                row_count = conn.execute(f"SELECT count(*) FROM read_parquet('{out}')").fetchone()[0]
+                print(f"  {table}: {row_count:,} rows → {out}")
+    finally:
+        shutil.rmtree(chunk_dir, ignore_errors=True)
 
     print("Done.")
 
@@ -238,7 +358,16 @@ if __name__ == "__main__":
     parser.add_argument("--sf", type=int, default=1, help="TPC-H scale factor")
     parser.add_argument(
         "--data-dir", type=Path, default=None,
-        help="Base data directory (default: data/<sf>)",
+        help="Base data directory (default: data/sf=<sf>)",
+    )
+    parser.add_argument(
+        "--chunks", type=int, default=1,
+        help=(
+            "Generate base tables in N sequential chunks using the dbgen binary "
+            "instead of loading the full dataset into memory at once. "
+            "Recommended for SF >= 100. Each chunk uses roughly (SF / N) GB of RAM. "
+            "Example: --sf 300 --chunks 10"
+        ),
     )
     parser.add_argument(
         "--refresh",
@@ -270,11 +399,11 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     data_dir = args.data_dir if args.data_dir is not None else Path("data") / f"sf={args.sf}"
-    generate(scale_factor=args.sf, data_dir=data_dir)
+    generate(scale_factor=args.sf, data_dir=data_dir, n_chunks=args.chunks)
     if args.refresh:
         n_sets = args.refresh_sets or (1 + max(1, round(0.1 * args.sf)))
         generate_refresh_data(scale_factor=args.sf, data_dir=data_dir, n_sets=n_sets)
     if args.query_streams:
-        from benchmarks.power import _spec_stream_count
-        n_streams = args.n_streams or _spec_stream_count(args.sf)
+        from benchmarks.power import spec_stream_count
+        n_streams = args.n_streams or spec_stream_count(args.sf)
         generate_query_streams(scale_factor=args.sf, n_streams=n_streams, data_dir=data_dir)
