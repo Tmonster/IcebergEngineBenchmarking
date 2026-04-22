@@ -27,7 +27,7 @@ BENCHMARK_CHOICES = ["load", "analytical", "power", "throughput", "composite"]
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--engine", required=True, choices=["duckdb", "spark"])
+    parser.add_argument("--engine", required=True, choices=["duckdb", "spark", "athena"])
     parser.add_argument("--benchmark", required=True, choices=BENCHMARK_CHOICES)
     parser.add_argument("--sf", type=int, default=None, help="Override scale factor from config")
     parser.add_argument("--catalog-config", default="config/catalog.yml")
@@ -56,6 +56,14 @@ def main() -> None:
 
     catalog = load_catalog(catalog_cfg)
     engine = load_engine(args.engine, catalog)
+
+    if args.benchmark not in engine.SUPPORTED_BENCHMARKS:
+        supported = ", ".join(sorted(engine.SUPPORTED_BENCHMARKS))
+        parser.error(
+            f"'{args.benchmark}' is not supported by the {args.engine} engine "
+            f"(supported: {supported})"
+        )
+
     runner = BenchmarkRunner(
         engine=engine,
         catalog=catalog,

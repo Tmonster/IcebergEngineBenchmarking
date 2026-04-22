@@ -4,8 +4,13 @@ from typing import Any
 
 from catalogs.base import Catalog
 
+_ALL_BENCHMARKS = frozenset({"load", "analytical", "power", "throughput", "composite"})
+
 
 class Engine(ABC):
+    # Subclasses can narrow this to restrict which benchmarks are valid for this engine.
+    SUPPORTED_BENCHMARKS: frozenset[str] = _ALL_BENCHMARKS
+
     def __init__(self, catalog: Catalog):
         self.catalog = catalog
 

@@ -6,7 +6,7 @@ TPC-H power and analytical benchmarks for Iceberg table engines (DuckDB and Spar
 
 | Engine | s3tables | local (PyIceberg) | DuckLake |
 |--------|----------|-------------------|----------|
-| DuckDB | ✓ | ✓ | ✓ |
+| DuckDB | ✓ | ✗ | ✓ |
 | Spark  | ✓ | ✗ | ✗ |
 
 ## Prerequisites
@@ -187,3 +187,5 @@ uv run --extra plot python plot_results.py results/duckdb_power_sf10_*.json resu
 - **Driver/executor memory** — set to 25 GB. Adjust in `catalog_adapters.py` for your instance.
 - **Delete strategy** — configured as merge-on-read. Copy-on-write causes `ValidationException: Missing required files to delete` on S3 Tables due to background file optimization rewriting Parquet files between DELETE planning and commit.
 - **Scheduler** — `spark.scheduler.mode=FAIR` is required for the throughput test so parallel query streams actually run concurrently rather than queuing.
+
+

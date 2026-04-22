@@ -56,11 +56,16 @@ class S3TablesCatalog(Catalog):
         return f"{ns}.{table}"
 
     def connection_properties(self) -> dict[str, Any]:
-        return {
+        props: dict[str, Any] = {
             "type": "s3tables",
             "s3tables_arn": self.warehouse,
             "region": self.region,
         }
+        # Optional fields consumed by AthenaEngine
+        for key in ("athena_output_location", "athena_catalog"):
+            if key in self.config.extra:
+                props[key] = self.config.extra[key]
+        return props
 
     def _create_namespace(self, namespace: str) -> None:
         try:

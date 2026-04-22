@@ -10,5 +10,8 @@ def load_engine(name: str, catalog: Catalog) -> Engine:
         case "spark":
             from engines.spark.engine import SparkEngine
             return SparkEngine(catalog)
+        case "athena":
+            from engines.athena.engine import AthenaEngine
+            return AthenaEngine(catalog)
         case _:
             raise ValueError(f"Unknown engine: {name!r}")

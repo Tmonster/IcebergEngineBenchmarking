@@ -46,7 +46,7 @@ def plot(df: pd.DataFrame, power_scores: dict[str, float], output: Path | None) 
     sns.set_theme(style="whitegrid", font_scale=0.9)
     palette = sns.color_palette("tab10", n_colors=len(labels))
 
-    fig, ax = plt.subplots(figsize=(max(12, len(queries) * 0.8), 6))
+    fig, ax = plt.subplots(figsize=(10, 4))
 
     sns.barplot(
         data=df,
@@ -58,6 +58,7 @@ def plot(df: pd.DataFrame, power_scores: dict[str, float], output: Path | None) 
         estimator="median",
         errorbar=("pi", 100),   # min/max whiskers across runs
         palette=palette,
+        width=0.9,
         ax=ax,
     )
 
@@ -70,7 +71,7 @@ def plot(df: pd.DataFrame, power_scores: dict[str, float], output: Path | None) 
     ax.set_xlabel("Query")
     ax.set_ylabel("Elapsed (s)")
     ax.legend(title="Engine", bbox_to_anchor=(1.01, 1), loc="upper left")
-    fig.tight_layout()
+    fig.tight_layout(rect=[0, 0, 0.82, 1])
 
     if output:
         fig.savefig(output, dpi=150)
@@ -79,10 +80,13 @@ def plot(df: pd.DataFrame, power_scores: dict[str, float], output: Path | None) 
         plt.show()
 
 
+DEFAULT_OUTPUT_DIR = Path("results/images/tmp")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("files", nargs="+", type=Path, help="Result JSON files")
-    parser.add_argument("--output", "-o", type=Path, default=None, help="Save to file instead of showing")
+    parser.add_argument("--output", "-o", type=Path, default=None, help="Save to file (default: results/images/tmp/<stems>.png)")
     args = parser.parse_args()
 
     missing = [f for f in args.files if not f.exists()]
@@ -96,7 +100,13 @@ def main() -> None:
         print("No successful results found in the provided files.", file=sys.stderr)
         sys.exit(1)
 
-    plot(df, power_scores, args.output)
+    output = args.output
+    if output is None:
+        DEFAULT_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        name = "_".join(f.stem for f in args.files) + ".png"
+        output = DEFAULT_OUTPUT_DIR / name
+
+    plot(df, power_scores, output)
 
 
 if __name__ == "__main__":
